@@ -362,7 +362,6 @@ function Protocol.Receive(prefix,payload,channel,sender)
 end
 
 function Protocol.Tick()
-    FC.Quests.Tick()
     FC.QuestSync.Expire()
     if not Protocol.enabled then return end
     local now=GetTime()

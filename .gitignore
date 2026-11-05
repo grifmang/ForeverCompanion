@@ -9,6 +9,7 @@ SavedVariables/
 WTF/
 work/
 .codex/
+.superpowers/
 .env
 .env.*
 !.env.example

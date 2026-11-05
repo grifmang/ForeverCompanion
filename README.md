@@ -1,6 +1,6 @@
 # Forever Companion
 
-Version 0.1.8-prototype — a WoW: Forever addon suite with four optional modules.
+Version 0.1.9-prototype — a WoW: Forever addon suite with five optional modules.
 
 **Status:** Source has been checked with a Lua 5.1 syntax parser. Real-client loading, SavedVariables persistence, tooltip behavior, Legacy data and two-player synchronization still need verification. This is a prototype, not a launch-ready release.
 
@@ -43,6 +43,7 @@ Use **`/fc updates`** or Settings for your installed version and a copyable rele
 | `/fc legacy` | Legacy Compass |
 | `/fc wallet` | Launch Wallet |
 | `/fc items` | Keep or Sell? |
+| `/fc quests` | Quest Helper |
 | `/fc party` | Adventure Together |
 | `/fc settings` | Module switches |
 | `/fc updates` | Installed version and release information |
@@ -50,6 +51,18 @@ Use **`/fc updates`** or Settings for your installed version and a copyable rele
 | `/fc diagnostics` | Client build, capabilities and bounded recent errors |
 
 Drag the window to move it. Escape closes it. Fields do not take focus automatically; press Enter or Escape to finish typing. Switch off any module in Settings without deleting its saved data.
+
+## Quest Helper
+
+Open **`/fc quests`**. **Nearby** shows quest pickups grouped by giver or map location. Select a pickup to open the map. When the work area is known, the list shows which quests can be done together. **Likely available** means you may still need a prerequisite; **Confirmed offer** means the quest was recently offered in the native NPC dialogue. Talk to the NPC to accept it.
+
+**Route** organizes accepted quests by the location of their current objectives. Choose **Track** beside an area to start at its nearest known quest. The current target stays selected as you move, and the route advances when you finish its work in that area. Use **Focus** to select a particular quest and **Stop** to end the route. Finished quests move to **Turn in**. Instanced quests and quests without usable locations remain visible. A tilde marks an approximate straight-line distance. If the quest log is incomplete, expand its collapsed sections in Blizzard's quest log.
+
+For wider pickup and objective coverage, separately install [QuestieDB Forever](https://github.com/Questie/QuestieDB/releases). Quest Helper also reads offers and map data from the game without QuestieDB. Coverage varies, especially for new Forever quests, and the add-on leaves missing locations unknown. A map guidance message explains if the client cannot place a pin or you already have another destination selected. Quest Helper does not alter your quest watch list.
+
+Use **Preview Quest Helper in place of the Blizzard Objective Tracker** to try the same list on the HUD. Replacement starts off by default. The **Blizzard** button returns to the original tracker. The game can keep or restore its own tracker for protected actions, instances, other objective types, Edit Mode or controller navigation; switches that need to wait for combat are deferred. The original Quest Log and World Map remain available.
+
+In an active Adventure Together session, quest rows show party readiness and unknown reports, with your checklist progress at the bottom. The two modules can run independently. Quest Helper doesn't share your location, route or pickup list.
 
 ## Legacy Compass
 
@@ -155,4 +168,4 @@ For local static validation, use `npm ci --ignore-scripts` followed by `npm run 
 
 ## Source and license
 
-Original Lua source is included and licensed under MIT. API compatibility was researched using Blizzard's Forever UI source mirrored in [Gethe/wow-ui-source](https://github.com/Gethe/wow-ui-source/tree/forever), and the [client API export metadata](https://github.com/Atraeau/WoW-Addons/blob/main/docs/api/README.md). No third-party addon source or runtime library is bundled. The development-only Lua parser is excluded from addon releases.
+Original Lua source is included and licensed under MIT. API compatibility was researched using Blizzard's Forever UI source mirrored in [Gethe/wow-ui-source](https://github.com/Gethe/wow-ui-source/tree/forever), and the [client API export metadata](https://github.com/Atraeau/WoW-Addons/blob/main/docs/api/README.md). The optional [QuestieDB consumer API](https://github.com/Questie/QuestieDB/blob/master/docs/api.md) reads an independently installed Forever dataset. No third-party addon source, dataset or runtime library is bundled. The development-only Lua parser is excluded from addon releases.

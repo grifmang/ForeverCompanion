@@ -7,7 +7,8 @@ const expected = [
   'Core.lua', 'API.lua', 'Store.lua', 'UI/Widgets.lua', 'UI/Shell.lua',
   'Modules/PriceAPI.lua', 'Modules/Wallet.lua', 'Modules/RecipeAPI.lua',
   'Modules/Crafting.lua', 'Modules/Items.lua', 'Modules/LegacyAPI.lua',
-  'Modules/Legacy.lua', 'Modules/QuestTracker.lua', 'Modules/QuestSync.lua',
+  'Modules/Legacy.lua', 'Modules/QuestTracker.lua', 'Modules/QuestData.lua', 'Modules/QuestRoute.lua',
+  'Modules/QuestGuide.lua', 'Modules/QuestHUD.lua', 'Modules/QuestSync.lua',
   'Modules/QuestLogUI.lua', 'Modules/ObjectiveTrackerUI.lua',
   'Modules/Adventure.lua', 'Modules/Updates.lua', 'Modules/PartyProtocol.lua', 'Startup.lua'
 ];
@@ -38,7 +39,7 @@ try {
   });
   if (tocs[0] !== tocs[1]) fail('Flavor TOCs differ.');
   const entries = tocs[0].split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#'));
-  if (entries.length !== expected.length || entries.some((entry, index) => entry !== expected[index])) fail('TOC runtime paths or order differ from the 20-file allowlist.');
+  if (entries.length !== expected.length || entries.some((entry, index) => entry !== expected[index])) fail(`TOC runtime paths or order differ from the ${expected.length}-file allowlist.`);
   const versions = [...tocs[0].matchAll(/^## Version: ([^\r\n]+)$/gm)];
   if (versions.length !== 1 || !/^\d+\.\d+\.\d+-prototype(?:\.[1-9]\d{0,6})?$/.test(versions[0][1])) fail('Missing or invalid prototype TOC version.');
   const core = fs.readFileSync(regularFile(root, 'Core.lua'), 'utf8').replace(/^\uFEFF/, '');

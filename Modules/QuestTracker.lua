@@ -43,10 +43,12 @@ end
 
 local function boolean(value) return FC.Readable(value) and type(value)=="boolean" end
 local function same(a,b)
-    if not a or a.title~=b.title or a.status~=b.status or a.observed~=b.observed or #a.objectives~=#b.objectives then return false end
+    if not a or a.title~=b.title or a.status~=b.status or a.observed~=b.observed
+        or a.specialItem~=b.specialItem or a.specialAction~=b.specialAction or a.autoComplete~=b.autoComplete
+        or a.isTask~=b.isTask or a.level~=b.level or #a.objectives~=#b.objectives then return false end
     for i,objective in ipairs(a.objectives) do
         local other=b.objectives[i]
-        if objective.text~=other.text or objective.have~=other.have or objective.need~=other.need
+        if objective.text~=other.text or objective.type~=other.type or objective.have~=other.have or objective.need~=other.need
             or objective.finished~=other.finished then return false end
     end
     return true
@@ -69,7 +71,8 @@ end
 local function staleRecords()
     local records={}
     for id,old in pairs(Quests.records) do
-        records[id]={id=id,title=old.title,status=old.status,objectives=old.objectives,observed=false,version=old.version}
+        records[id]={id=id,title=old.title,status=old.status,objectives=old.objectives,observed=false,version=old.version,
+            specialItem=old.specialItem,specialAction=old.specialAction,autoComplete=old.autoComplete,isTask=old.isTask,level=old.level}
     end
     return records
 end
@@ -94,7 +97,8 @@ local function objectives(id)
         local have,hr=field(row,"numFulfilled")
         local need,nr=field(row,"numRequired")
         local finished,fr=field(row,"finished")
-        local objective={text=text(label,192) or ("Objective " .. i)}
+        local kind=field(row,"type")
+        local objective={text=text(label,192) or ("Objective " .. i),type=text(kind,24)}
         if hr and FC.Number(have,0,999999) then objective.have=have else partial=true end
         if nr and FC.Number(need,0,999999) then objective.need=need else partial=true end
         if fr and boolean(finished) then objective.finished=finished else partial=true end
@@ -107,9 +111,11 @@ end
 local function scan()
     local status,shown,total=FC.SafeRead(C_QuestLog and C_QuestLog.GetNumQuestLogEntries)
     if status~="ready" or not FC.Number(shown,0,1000) or not FC.Number(total,0,1000) then
+        Quests.membershipComplete=false
         commit(staleRecords(),status=="restricted" and "restricted" or "unavailable",false)
         return false
     end
+    Quests.count=total
     local records,seen,count,rows={}, {},0,0
     local complete,readableRows,restricted=true,0,false
     for index=1,shown do
@@ -135,23 +141,43 @@ local function scan()
                     title=text(title,96) or Quests.Label(id)
                     local list,problem=objectives(id)
                     local cs,done=FC.SafeRead(C_QuestLog and C_QuestLog.IsComplete,id)
-                    local failed,fr=field(info,"isFailed")
+                    local fs,failed=FC.SafeRead(C_QuestLog and C_QuestLog.IsFailed,id)
                     local state="A"
-                    if problem then state=problem; complete=false
-                    elseif cs~="ready" or not boolean(done) or not fr or not boolean(failed) then state="U"; complete=false
+                    if problem then complete=false end
+                    if cs~="ready" or not boolean(done) or fs~="ready" or not boolean(failed) then state="U"; complete=false
                     elseif failed then state="F"
-                    elseif done then state="C" end
-                    records[id]={id=id,title=title,status=state,objectives=list,observed=true}
+                    elseif done then state="C"
+                    elseif problem then state=problem end
+                    local level=field(info,"level")
+                    local autoComplete=field(info,"isAutoComplete")
+                    local isTask=field(info,"isTask")
+                    local itemStatus,link=FC.SafeRead(GetQuestLogSpecialItemInfo,index)
+                    local specialItem
+                    if itemStatus=="ready" then specialItem=link~=nil end
+                    local timerStatus,totalTime,timeElapsed=FC.SafeRead(C_QuestLog and C_QuestLog.GetTimeAllowed,id)
+                    local groupStatus,canGroup=FC.SafeRead(QuestUtil and QuestUtil.CanCreateQuestGroup,id)
+                    local specialAction=timerStatus=="ready" and type(totalTime)=="number" and type(timeElapsed)=="number" and timeElapsed<totalTime
+                        or groupStatus=="ready" and canGroup==true
+                    for _,objective in ipairs(list) do
+                        if objective.type=="progressbar" then specialAction=true; break end
+                    end
+                    records[id]={id=id,title=title,status=state,objectives=list,observed=true,
+                        level=FC.Number(level,0,999) and level or nil,autoComplete=autoComplete==true,
+                        isTask=isTask==true,specialItem=specialItem,specialAction=specialAction}
                     count=count+1
                 end
             end
         end
     end
     if shown>0 and readableRows==0 then
+        Quests.membershipComplete=false
         commit(staleRecords(),restricted and "restricted" or "unavailable",false)
         return false
     end
-    if rows~=total then complete=false end
+    local observedCount=0
+    for _,record in pairs(records) do if record.observed then observedCount=observedCount+1 end end
+    Quests.membershipComplete=rows==total and observedCount==total and readableRows==shown
+    if not Quests.membershipComplete then complete=false end
     if not complete then
         -- A partial view never authoritatively removes a quest. Prefer retaining
         -- existing IDs over newly exposed IDs if the combined view exceeds 100.
@@ -169,7 +195,8 @@ local function scan()
                 end
                 if count<MAX_QUESTS then
                     local old=Quests.records[id]
-                    records[id]={id=id,title=old.title,status=old.status,objectives=old.objectives,observed=false}
+                    records[id]={id=id,title=old.title,status=old.status,objectives=old.objectives,observed=false,
+                        specialItem=old.specialItem,specialAction=old.specialAction,autoComplete=old.autoComplete,isTask=old.isTask,level=old.level}
                     count=count+1
                 end
             end
@@ -183,13 +210,19 @@ function Quests.Enable()
     if enabled then return end
     enabled,dirty,nextScan,lastScan=true,true,0,-1
     Quests.records,Quests.removed,Quests.revision,Quests.status,Quests.complete={},{},0,"loading",false
+    Quests.membershipComplete,Quests.count=false,nil
     Quests.generation=nil
     if FC.Store.CanWrite() then Quests.generation=FC.Store.NewID("quests") end
 end
 
 function Quests.Disable()
+    if not enabled then return end
     enabled,dirty=false,false
     commit(staleRecords(),"disabled",false)
+end
+
+function Quests.SyncEnabled()
+    if FC.IsEnabled("quests") or FC.IsEnabled("party") then Quests.Enable() else Quests.Disable() end
 end
 
 function Quests.Tick()
@@ -202,8 +235,8 @@ function Quests.Tick()
 end
 
 local events={PLAYER_LOGIN=true,PLAYER_ENTERING_WORLD=true,PLAYER_REGEN_ENABLED=true,
-    QUEST_LOG_UPDATE=true,QUEST_ACCEPTED=true,QUEST_REMOVED=true,QUEST_TURNED_IN=true,
-    QUEST_WATCH_UPDATE=true,QUEST_LOG_CRITERIA_UPDATE=true,QUEST_DATA_LOAD_RESULT=true}
+    QUEST_LOG_UPDATE=true,QUEST_ACCEPTED=true,QUEST_REMOVED=true,QUEST_TURNED_IN=true,QUEST_AUTOCOMPLETE=true,QUEST_COMPLETE=true,
+    QUEST_WATCH_UPDATE=true,QUEST_WATCH_LIST_CHANGED=true,QUEST_LOG_CRITERIA_UPDATE=true,QUEST_DATA_LOAD_RESULT=true}
 function Quests.OnEvent(event,id)
     if enabled and (event=="QUEST_REMOVED" or event=="QUEST_TURNED_IN") and FC.Number(id,1,10000000) then
         local records={}

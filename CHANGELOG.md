@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.9-prototype — Quest Helper
+
+- Added Nearby quest pickups and Route sections grouped by objective area, with nearest-quest tracking, automatic advance and ready turn-ins.
+- Added a WoW-style Objective Tracker replacement preview with an Adventure Together overlay and a stock-tracker fallback for special game actions.
+- Added optional QuestieDB Forever coverage, alongside native map and NPC offers. No quest data is bundled and route selections are not shared.
+- Replacement is off by default pending the live-client acceptance walkthrough.
+
 ## 0.1.8-prototype — GitHub distribution and update notices
 
 - Added automated, numbered GitHub preview releases on pushes to main, with curated Forever-flavor ZIPs and SHA-256 checksums suitable for WowUp's repository URL installation.

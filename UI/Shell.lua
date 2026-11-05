@@ -1,6 +1,6 @@
 local _, FC = ...
 local UI = FC.UI
-local titles = {legacy = "Legacy Compass", wallet = "Launch Wallet", items = "Keep or Sell?", party = "Adventure Together", settings = "Settings"}
+local titles = {legacy = "Legacy Compass", wallet = "Launch Wallet", items = "Keep or Sell?", quests = "Quest Helper", party = "Adventure Together", settings = "Settings"}
 
 local function ensure()
     if UI.window then return end
@@ -34,10 +34,10 @@ local function ensure()
     close:SetPoint("TOPRIGHT", -7, -7)
     table.insert(UISpecialFrames, "ForeverCompanionWindow")
     UI.tabs = {}
-    local keys = {"legacy", "wallet", "items", "party", "settings"}
+    local keys = {"legacy", "wallet", "items", "quests", "party", "settings"}
     for index, key in ipairs(keys) do
         local button = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-        button:SetPoint("TOPLEFT", 22 + (index - 1) * 160, -77); button:SetSize(154, 26)
+        button:SetPoint("TOPLEFT", 22 + (index - 1) * 135, -77); button:SetSize(129, 26)
         button:SetText(titles[key]); button:SetScript("OnClick", function() UI.Open(key) end)
         UI.tabs[key] = button
     end
@@ -59,11 +59,11 @@ local function renderSettings(parent)
             UI.Result(FC.SetEnabled(key, enabled))
         end, FC.Store.CanWrite())
     end
-    UI.Label(parent, "Version " .. FC.version .. "  |  /fc diagnostics prints client capabilities and recent errors.", 0, 260)
-    UI.Label(parent, FC.Updates and FC.Updates.Status() or "Use /fc updates for release information.", 0, 298)
-    UI.Input(parent, "Release page (copy this link)", 0, 356, 730, FC.Updates and FC.Updates.url or "", 128, function() end)
-    UI.Label(parent, "Enabled sharing also announces your installed addon version to the active group.", 0, 425)
-    UI.Height(480)
+    UI.Label(parent, "Version " .. FC.version .. "  |  /fc diagnostics prints client capabilities and recent errors.", 0, 290)
+    UI.Label(parent, FC.Updates and FC.Updates.Status() or "Use /fc updates for release information.", 0, 328)
+    UI.Input(parent, "Release page (copy this link)", 0, 375, 730, FC.Updates and FC.Updates.url or "", 128, function() end)
+    UI.Label(parent, "Enabled sharing also announces your installed addon version to the active group.", 0, 444)
+    UI.Height(500)
 end
 
 function UI.Render()
@@ -73,6 +73,7 @@ function UI.Render()
         UI.footer:SetText(FC.Store.status or UI.message)
         return
     end
+    if FC.QuestHUD then FC.QuestHUD.HidePanel() end
     UI.Begin(UI.child)
     if not FC.Store.Character() then
         UI.Label(UI.child, "Character data is not available yet. Try again after entering the world.", 0, 0)

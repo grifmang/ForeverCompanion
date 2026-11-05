@@ -1,13 +1,13 @@
 # Forever Companion real-client acceptance
 
-Release: 0.1.8-prototype builds. **None of the in-game checks below has been executed by the author.** Static syntax and packaging results are reported in VERIFICATION.md inside the addon folder.
+Release: 0.1.9-prototype builds. **This is a walkthrough, not evidence of an in-game pass.** Static syntax and packaging results are reported in VERIFICATION.md inside the addon folder.
 
 Use one Forever release character and one additional real client for party sharing. Reuse those two characters throughout; no device matrix or lower-level harness is required.
 
 ## Load, UI and persistence
 
 - [ ] Enable Forever Companion, enter the world and run `/fc diagnostics`. Record actual version, build and interface; expected provisional interface is 16001.
-- [ ] Open all four module tabs and Settings without Lua errors. Drag the window, close with Escape, reopen, reload, and verify its location and module switches persist.
+- [ ] Open all five module tabs and Settings without Lua errors. Drag the window, close with Escape, reopen, reload, and verify its location and module switches persist.
 - [ ] Toggle a module off and on. Its data remains, its behavior stops while disabled, and other modules remain usable.
 - [ ] With the game closed and the suite's SavedVariables backed up, change only its schema field to a newer number. Re-enter and confirm the original root is preserved read-only. Restore the backed-up file with the game closed. Skip this destructive fixture step if a safe backup cannot be made; record the gap.
 - [ ] With a separate backed-up fixture, introduce invalid records, including more than 20 invalid entries and malformed draft fields. The recovered view is read-only and the entire original SavedVariables root remains intact. Restore the backup with the game closed.
@@ -17,6 +17,14 @@ Use one Forever release character and one additional real client for party shari
 - [ ] In WowUp, select the Forever release installation, install from the repository URL, and verify the destination and installed version. After an ordinary later main push publishes a new numbered preview, confirm Check Updates detects it. Use the named `-forever.zip` release asset for manual fallback; never use the automatic source archive as the install package.
 - [ ] Run `/fc updates` and open Settings. Installed version and the fixed release link are visible. With sharing enabled, group two real clients on different supported builds: the older one eventually receives one clearly labeled member-reported newer-version notice, even without a shared checklist. Newer clients do not claim a downgrade is needed. Unchanged heartbeats, session restarts and group churn do not repeat the notice during the same login/reload.
 - [ ] Pause sharing or disable Adventure Together, then join/rejoin: version traffic and notices stop along with other sharing. Combat/restrictions defer traffic. No credentials, external request, download, install, quest action or ordinary chat transmission comes from the in-game notice.
+
+## Quest Helper — one leveling route
+
+- [ ] Open `/fc quests`; stock HUD is still in use on first load. Open Nearby and compare game-reported offers with a nearby NPC. If QuestieDB Forever is available, check a hub with multiple pickups and verify shared work area hints, including one pair from different givers. Confirm a live offer and accept it normally; the pickup disappears and becomes a Route row. Verify the no-provider state is usable.
+- [ ] Use accepted quests with two separate work areas. Verify the list groups by objective destination rather than by quest giver. Track an area and compare the first target with known nearby positions. Move toward another quest without finishing the current one; the target stays selected. Complete the work for one quest, check that the nearest remaining quest is selected, and check that the finished quest appears in Turn in. When only this area's work is complete, keep the quest in its other section. A quest without coordinates remains visible.
+- [ ] Open quest details, place a pickup or turn-in map marker, focus a quest manually and stop the route. Verify a pre-existing user pin is retained, and prior quest guidance is restored only if Quest Helper still owns the active selection. Try native quest POIs on and off without changing unrelated settings. Collapse a Blizzard quest log section; hidden entries must not be treated as completed or abandoned.
+- [ ] Enable the replacement preview outside combat. Check that the HUD uses the native tracker position without covering right action bars. Test the Blizzard button, module toggle, a reload, and the switch while in combat; at least one tracker remains usable where the game normally shows it. If naturally available, verify fallback for a quest item or timer and a tracked achievement or instance objective. Verify the ordinary map, quest log, and item action still work.
+- [ ] Reuse the same quests with a second Forever character in Adventure Together. The same route row shows updated readiness, unknown reports and the checklist link. Disable Adventure Together and verify solo routing continues; turn off Quest Helper and confirm native Adventure Together annotations resume. Record unsupported data/client cases rather than substituting a mock.
 
 ## Native quest log and Objective Tracker — one focused group scenario
 
