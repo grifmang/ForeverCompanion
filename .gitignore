@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.zip
+*.sha256
+ForeverCompanionDB*
+ForeverCompanion.lua
+ForeverCompanion.lua.bak
+SavedVariables/
+WTF/
+work/
+.codex/
+.env
+.env.*
+!.env.example
+*.log

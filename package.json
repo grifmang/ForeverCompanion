@@ -1,0 +1,12 @@
+{
+  "name": "forever-companion-release-tools",
+  "version": "0.1.8",
+  "private": true,
+  "description": "Static Lua syntax and allowlisted release packaging for Forever Companion.",
+  "scripts": {
+    "check:lua": "node Tools/check-lua.cjs"
+  },
+  "devDependencies": {
+    "luaparse": "0.3.1"
+  }
+}

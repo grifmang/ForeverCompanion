@@ -1,0 +1,213 @@
+name: Publish Forever prototype
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forever-companion-release-main
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'grifmang/ForeverCompanion' && github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.package.outputs.version }}
+      tag: ${{ steps.package.outputs.tag }}
+      archive_name: ${{ steps.package.outputs.archive_name }}
+      sha_name: ${{ steps.package.outputs.sha_name }}
+      metadata_name: ${{ steps.package.outputs.metadata_name }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned syntax parser without lifecycle scripts
+        shell: pwsh
+        run: npm ci --ignore-scripts --no-fund --no-audit
+      - name: Parse source Lua without executing addon code
+        shell: pwsh
+        run: npm run check:lua
+      - name: Build and verify allowlisted install archive
+        id: package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $taskRelease = & ./Tools/Build-Release.ps1 -OutputDirectory (Join-Path $env:RUNNER_TEMP 'fc-release') -BuildNumber ([int]$env:GITHUB_RUN_NUMBER)
+          node ./Tools/check-lua.cjs --root $taskRelease.Stage
+          if ($LASTEXITCODE -ne 0) { throw 'Staged Lua syntax verification failed.' }
+          @(
+            "version=$($taskRelease.Version)"
+            "tag=$($taskRelease.Tag)"
+            "archive_name=$([IO.Path]::GetFileName($taskRelease.Archive))"
+            "sha_name=$([IO.Path]::GetFileName($taskRelease.SHA256File))"
+            "metadata_name=$([IO.Path]::GetFileName($taskRelease.Metadata))"
+            "archive_path=$($taskRelease.Archive)"
+            "sha_path=$($taskRelease.SHA256File)"
+            "metadata_path=$($taskRelease.Metadata)"
+          ) | Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8
+      - name: Transfer only verified release files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: forever-release-package
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            ${{ steps.package.outputs.archive_path }}
+            ${{ steps.package.outputs.sha_path }}
+            ${{ steps.package.outputs.metadata_path }}
+
+  publish:
+    needs: build
+    if: github.repository == 'grifmang/ForeverCompanion' && github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      # This job does not check out or execute repository/artifact source code.
+      - name: Receive immutable build artifact from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: forever-release-package
+          path: ${{ runner.temp }}/fc-publish
+      - name: Verify transfer and publish a versioned prototype
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: grifmang/ForeverCompanion
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+          ARCHIVE_NAME: ${{ needs.build.outputs.archive_name }}
+          SHA_NAME: ${{ needs.build.outputs.sha_name }}
+          METADATA_NAME: ${{ needs.build.outputs.metadata_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+-prototype\.[1-9]\d{0,6}$') { throw 'Invalid build version.' }
+          if ($env:RELEASE_TAG -cne ('v' + $env:RELEASE_VERSION)) { throw 'Tag/version mismatch.' }
+          if ($env:GITHUB_SHA -notmatch '^[0-9a-f]{40}$') { throw 'Invalid source commit.' }
+          $taskArchiveName = 'ForeverCompanion-' + $env:RELEASE_VERSION + '-forever.zip'
+          $taskMetadataName = 'ForeverCompanion-' + $env:RELEASE_VERSION + '.json'
+          if ($env:ARCHIVE_NAME -cne $taskArchiveName -or $env:SHA_NAME -cne ($taskArchiveName + '.sha256') -or $env:METADATA_NAME -cne $taskMetadataName) { throw 'Unexpected asset names.' }
+          $taskDirectory = Join-Path $env:RUNNER_TEMP 'fc-publish'
+          $taskArchivePath = Join-Path $taskDirectory $taskArchiveName
+          $taskSidecarPath = $taskArchivePath + '.sha256'
+          $taskMetadataPath = Join-Path $taskDirectory $taskMetadataName
+          if (@(Get-ChildItem -LiteralPath $taskDirectory -File -Recurse).Count -ne 3) { throw 'Unexpected transferred files.' }
+          foreach ($taskPath in @($taskArchivePath,$taskSidecarPath,$taskMetadataPath)) {
+            if (-not (Test-Path -LiteralPath $taskPath -PathType Leaf) -or ((Get-Item -LiteralPath $taskPath -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Missing or linked asset.' }
+          }
+          $taskMetadata = Get-Content -LiteralPath $taskMetadataPath -Raw | ConvertFrom-Json
+          if ($taskMetadata.Version -cne $env:RELEASE_VERSION -or $taskMetadata.Tag -cne $env:RELEASE_TAG -or $taskMetadata.BuildNumber -ne [int]$env:GITHUB_RUN_NUMBER) { throw 'Build metadata mismatch.' }
+          $taskHash = (Get-FileHash -LiteralPath $taskArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $taskSidecar = (Get-Content -LiteralPath $taskSidecarPath -Raw).TrimEnd()
+          if ($taskMetadata.ArchiveSHA256 -cne $taskHash -or $taskSidecar -cne ($taskHash + '  ' + $taskArchiveName)) { throw 'Transferred archive checksum mismatch.' }
+          $taskPaths = @(
+            'Core.lua','API.lua','Store.lua','UI/Widgets.lua','UI/Shell.lua',
+            'Modules/PriceAPI.lua','Modules/Wallet.lua','Modules/RecipeAPI.lua',
+            'Modules/Crafting.lua','Modules/Items.lua','Modules/LegacyAPI.lua',
+            'Modules/Legacy.lua','Modules/QuestTracker.lua','Modules/QuestSync.lua',
+            'Modules/QuestLogUI.lua','Modules/ObjectiveTrackerUI.lua','Modules/Adventure.lua',
+            'Modules/Updates.lua','Modules/PartyProtocol.lua','Startup.lua',
+            'ForeverCompanion.toc','ForeverCompanion_Camelot.toc','README.md','CHANGELOG.md',
+            'LICENSE','ACCEPTANCE.md','VERIFICATION.md'
+          )
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $taskZip = [IO.Compression.ZipFile]::OpenRead($taskArchivePath)
+          try {
+            if ($taskZip.Entries.Count -ne $taskPaths.Count -or @($taskMetadata.Files).Count -ne $taskPaths.Count) { throw 'Archive/manifest count mismatch.' }
+            foreach ($taskRelative in $taskPaths) {
+              $taskEntry = $taskZip.GetEntry('ForeverCompanion/' + $taskRelative)
+              $taskManifest = @($taskMetadata.Files | Where-Object { $_.Path -ceq $taskRelative })
+              if (-not $taskEntry -or $taskManifest.Count -ne 1) { throw "Missing/ambiguous archive path: $taskRelative" }
+              $taskStream = $taskEntry.Open()
+              $taskHasher = [Security.Cryptography.SHA256]::Create()
+              try { $taskEntryHash = [BitConverter]::ToString($taskHasher.ComputeHash($taskStream)).Replace('-','').ToLowerInvariant() }
+              finally { $taskStream.Dispose(); $taskHasher.Dispose() }
+              if ($taskEntryHash -cne $taskManifest[0].SHA256) { throw "Archive entry checksum mismatch: $taskRelative" }
+            }
+          } finally { $taskZip.Dispose() }
+          $taskNotesPath = Join-Path $taskDirectory 'release-notes.md'
+          @(
+            "Forever Companion $env:RELEASE_VERSION is an automatically packaged prototype for WoW Forever."
+            ''
+            'Lua 5.1 static parsing, the install-archive allowlist, and file checksums passed. In-game loading, native UI behavior and party synchronization still require real-client verification.'
+            ''
+            'Install the -forever.zip asset with one ForeverCompanion folder directly under Interface/AddOns. Existing addon managers should use the prototype/beta release channel.'
+            ''
+            "Source commit: $env:GITHUB_SHA"
+            "ZIP SHA-256: $taskHash"
+          ) | Set-Content -LiteralPath $taskNotesPath -Encoding utf8NoBOM
+          $PSNativeCommandUseErrorActionPreference = $false
+          function Get-ApiJson([string]$Endpoint) {
+            # Inspect the HTTP status: authentication/network errors are never
+            # treated as proof that a tag or release does not exist.
+            $taskResponse = (& gh api --include $Endpoint 2>&1 | Out-String)
+            $taskExit = $LASTEXITCODE
+            if ($taskResponse -match '^HTTP/[\d.]+\s+404\b') { return $null }
+            if ($taskExit -ne 0) { throw "GitHub API request failed: $Endpoint" }
+            $taskParts = [regex]::Split($taskResponse,'\r?\n\r?\n',2)
+            if ($taskParts.Count -ne 2) { throw 'Unrecognized GitHub API response.' }
+            return ($taskParts[1] | ConvertFrom-Json)
+          }
+          function Find-Release() {
+            $taskFound = Get-ApiJson "repos/$env:GH_REPO/releases/tags/$env:RELEASE_TAG"
+            if ($taskFound) { return $taskFound }
+            # Drafts may not be returned by the published-by-tag endpoint.
+            # A retry's recent draft is in this bounded first page. An older
+            # collision still fails safely when release creation is attempted.
+            $taskRecent = Get-ApiJson "repos/$env:GH_REPO/releases?per_page=100"
+            $taskFound = @($taskRecent | Where-Object { $_.tag_name -ceq $env:RELEASE_TAG })
+            if ($taskFound.Count -gt 1) { throw 'Ambiguous existing release.' }
+            if ($taskFound.Count -eq 1) { return $taskFound[0] }
+            return $null
+          }
+          function Assert-ExistingAssets($Release) {
+            if ($Release.tag_name -cne $env:RELEASE_TAG -or $Release.prerelease -ne $true) { throw 'Existing release identity/channel differs.' }
+            $taskSeen = @{}
+            foreach ($taskAsset in @($Release.assets)) {
+              if ($taskAsset.name -cne $taskArchiveName -and $taskAsset.name -cne ($taskArchiveName + '.sha256')) { throw 'Existing release has unexpected assets; refusing to modify it.' }
+              if ($taskSeen.ContainsKey($taskAsset.name)) { throw 'Existing release has duplicate asset names.' }
+              $taskSeen[$taskAsset.name] = $true
+              $taskVerifyDir = Join-Path $taskDirectory ('verify-' + [guid]::NewGuid().ToString('N'))
+              $null = New-Item -ItemType Directory -Path $taskVerifyDir
+              gh release download $env:RELEASE_TAG --repo $env:GH_REPO --pattern $taskAsset.name --dir $taskVerifyDir | Out-Null
+              if ($LASTEXITCODE -ne 0) { throw 'Unable to verify an existing release asset.' }
+              $taskDownloaded = Join-Path $taskVerifyDir $taskAsset.name
+              $taskExpectedFile = if ($taskAsset.name -ceq $taskArchiveName) { $taskArchivePath } else { $taskSidecarPath }
+              if ((Get-FileHash -LiteralPath $taskDownloaded -Algorithm SHA256).Hash -cne (Get-FileHash -LiteralPath $taskExpectedFile -Algorithm SHA256).Hash) { throw 'Existing asset checksum differs; nothing will be overwritten.' }
+            }
+            return $taskSeen
+          }
+          $taskTag = Get-ApiJson "repos/$env:GH_REPO/git/ref/tags/$env:RELEASE_TAG"
+          if ($taskTag) {
+            if ($taskTag.object.type -cne 'commit' -or $taskTag.object.sha -cne $env:GITHUB_SHA) { throw 'Existing tag does not point directly to this source commit; refusing to modify it.' }
+          } else {
+            gh api --method POST "repos/$env:GH_REPO/git/refs" -f "ref=refs/tags/$env:RELEASE_TAG" -f "sha=$env:GITHUB_SHA" | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'Tag creation failed; nothing was overwritten.' }
+          }
+          $taskRelease = Find-Release
+          if ($taskRelease) {
+            $taskSeen = Assert-ExistingAssets $taskRelease
+            if (-not $taskRelease.draft) {
+              if ($taskSeen.Count -ne 2) { throw 'Published release is incomplete; refusing to modify it.' }
+              Write-Host 'This source commit and both verified assets are already published; no changes needed.'
+              exit 0
+            }
+            foreach ($taskAssetPath in @($taskArchivePath,$taskSidecarPath)) {
+              if (-not $taskSeen.ContainsKey([IO.Path]::GetFileName($taskAssetPath))) {
+                gh release upload $env:RELEASE_TAG $taskAssetPath --repo $env:GH_REPO
+                if ($LASTEXITCODE -ne 0) { throw 'Draft asset upload failed; existing assets were not overwritten.' }
+              }
+            }
+          } else {
+            gh release create $env:RELEASE_TAG $taskArchivePath $taskSidecarPath --repo $env:GH_REPO --target $env:GITHUB_SHA --verify-tag --draft --prerelease --title "Forever Companion $env:RELEASE_VERSION (prototype)" --notes-file $taskNotesPath
+            if ($LASTEXITCODE -ne 0) { throw 'Release upload failed; no existing release was overwritten.' }
+          }
+          $taskRelease = Find-Release
+          if (-not $taskRelease -or (Assert-ExistingAssets $taskRelease).Count -ne 2) { throw 'Draft asset verification did not complete.' }
+          gh release edit $env:RELEASE_TAG --repo $env:GH_REPO --draft=false --prerelease
+          if ($LASTEXITCODE -ne 0) { throw 'Prototype remains a draft because publication failed.' }
