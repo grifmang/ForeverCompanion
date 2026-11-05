@@ -1,6 +1,6 @@
 # Forever Companion quest helper
 
-Status: Proposed for approval. Target: World of Warcraft: Forever (Camelot), as a module in the existing Forever Companion add-on.
+Status: Approved on November 5, 2026. Target: World of Warcraft: Forever (Camelot), as a module in the existing Forever Companion add-on.
 
 ## What players will do
 

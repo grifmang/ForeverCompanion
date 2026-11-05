@@ -13,7 +13,8 @@ end
 
 local function newCharacter(name)
     return {name = name, nextID = 0, wallet = {}, needs = {}, keep = {}, crafting = {},
-        legacy = {pins = {}, plans = {}}, adventure = {title = "", meeting = "", tasks = {}}}
+        legacy = {pins = {}, plans = {}}, adventure = {title = "", meeting = "", tasks = {}},
+        questHelper = {view = "route"}}
 end
 
 local function quarantine(root, record)
@@ -85,6 +86,10 @@ function Store.Initialize()
         quarantine(root, root.settings.partySharing)
         root.settings.partySharing = false
     end
+    if root.settings.questReplacement ~= nil and type(root.settings.questReplacement) ~= "boolean" then
+        quarantine(root, root.settings.questReplacement)
+        root.settings.questReplacement = false
+    end
     for _, key in ipairs(FC.keys) do
         if type(root.settings.enabled[key]) ~= "boolean" then
             if root.settings.enabled[key] ~= nil then quarantine(root, root.settings.enabled[key]) end
@@ -111,6 +116,13 @@ function Store.Character()
         return record
     end
     local root = Store.root
+    if record.questHelper ~= nil and type(record.questHelper) ~= "table" then
+        quarantine(root, record.questHelper); record.questHelper = nil
+    end
+    record.questHelper = record.questHelper or {view = "route"}
+    local helper = record.questHelper
+    if helper.view ~= "nearby" then helper.view = "route" end
+    if type(helper.area) ~= "string" or #helper.area > 80 or not helper.area:match("^[%w:_%-]+$") then helper.area = nil end
     record.wallet = cleanList(root, record.wallet, 100, function(r)
         return validID(r) and label(r.label) and FC.Number(r.copper, 0, 10000000000)
             and type(r.active) == "boolean" and validPriceSource(r)

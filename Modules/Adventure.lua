@@ -224,7 +224,7 @@ function Adventure.Enable()
     -- Preserve explicit opt-outs; defaults are normalized by Store.Initialize.
     Adventure.retired,Adventure.discoveryContext,Adventure.lastAutoJoin,Adventure.nextJoinAttempt=nil,nil,nil,nil
     Adventure.sharing=FC.Store.root.settings.partySharing==true and FC.Store.CanWrite()
-    FC.Quests.Enable()
+    FC.Quests.SyncEnabled()
     if FC.QuestLogUI then FC.QuestLogUI.Enable() end
     if FC.ObjectiveTrackerUI then FC.ObjectiveTrackerUI.Enable() end
     if Adventure.sharing then
@@ -237,7 +237,7 @@ end
 function Adventure.Disable()
     Adventure.LeaveShared(); Adventure.sharing=false; FC.PartyProtocol.Disable()
     Adventure.discoveryContext=nil
-    FC.Quests.Disable()
+    FC.Quests.SyncEnabled()
     if FC.QuestLogUI then FC.QuestLogUI.Disable() end
     if FC.ObjectiveTrackerUI then FC.ObjectiveTrackerUI.Disable() end
 end
@@ -302,7 +302,6 @@ function Adventure.Render(parent)
 end
 
 function Adventure.OnEvent(event,...)
-    FC.Quests.OnEvent(event,...)
     if FC.QuestLogUI then FC.QuestLogUI.OnEvent(event,...) end
     if FC.ObjectiveTrackerUI then FC.ObjectiveTrackerUI.OnEvent(event,...) end
     if event=="GROUP_ROSTER_UPDATE" or event=="PARTY_LEADER_CHANGED" or event=="PLAYER_REGEN_ENABLED"

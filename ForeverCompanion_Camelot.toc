@@ -1,9 +1,10 @@
 ## Interface: 16001
 ## Title: Forever Companion
-## Notes: Legacy goals, gold budgets, material needs and group adventures.
+## Notes: Quest routes, group adventures, Legacy goals, gold budgets and material needs.
 ## Author: Forever Companion contributors
-## Version: 0.1.8-prototype
+## Version: 0.1.9-prototype
 ## SavedVariables: ForeverCompanionDB
+## OptionalDeps: QuestieDB
 
 Core.lua
 API.lua
@@ -18,6 +19,10 @@ Modules/Items.lua
 Modules/LegacyAPI.lua
 Modules/Legacy.lua
 Modules/QuestTracker.lua
+Modules/QuestData.lua
+Modules/QuestRoute.lua
+Modules/QuestGuide.lua
+Modules/QuestHUD.lua
 Modules/QuestSync.lua
 Modules/QuestLogUI.lua
 Modules/ObjectiveTrackerUI.lua
