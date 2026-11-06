@@ -44,8 +44,7 @@ end
 local function boolean(value) return FC.Readable(value) and type(value)=="boolean" end
 local function same(a,b)
     if not a or a.title~=b.title or a.status~=b.status or a.observed~=b.observed
-        or a.specialItem~=b.specialItem or a.specialAction~=b.specialAction or a.autoComplete~=b.autoComplete
-        or a.isTask~=b.isTask or a.level~=b.level or #a.objectives~=#b.objectives then return false end
+        or a.level~=b.level or #a.objectives~=#b.objectives then return false end
     for i,objective in ipairs(a.objectives) do
         local other=b.objectives[i]
         if objective.text~=other.text or objective.type~=other.type or objective.have~=other.have or objective.need~=other.need
@@ -72,7 +71,7 @@ local function staleRecords()
     local records={}
     for id,old in pairs(Quests.records) do
         records[id]={id=id,title=old.title,status=old.status,objectives=old.objectives,observed=false,version=old.version,
-            specialItem=old.specialItem,specialAction=old.specialAction,autoComplete=old.autoComplete,isTask=old.isTask,level=old.level}
+            level=old.level}
     end
     return records
 end
@@ -149,21 +148,8 @@ local function scan()
                     elseif done then state="C"
                     elseif problem then state=problem end
                     local level=field(info,"level")
-                    local autoComplete=field(info,"isAutoComplete")
-                    local isTask=field(info,"isTask")
-                    local itemStatus,link=FC.SafeRead(GetQuestLogSpecialItemInfo,index)
-                    local specialItem
-                    if itemStatus=="ready" then specialItem=link~=nil end
-                    local timerStatus,totalTime,timeElapsed=FC.SafeRead(C_QuestLog and C_QuestLog.GetTimeAllowed,id)
-                    local groupStatus,canGroup=FC.SafeRead(QuestUtil and QuestUtil.CanCreateQuestGroup,id)
-                    local specialAction=timerStatus=="ready" and type(totalTime)=="number" and type(timeElapsed)=="number" and timeElapsed<totalTime
-                        or groupStatus=="ready" and canGroup==true
-                    for _,objective in ipairs(list) do
-                        if objective.type=="progressbar" then specialAction=true; break end
-                    end
                     records[id]={id=id,title=title,status=state,objectives=list,observed=true,
-                        level=FC.Number(level,0,999) and level or nil,autoComplete=autoComplete==true,
-                        isTask=isTask==true,specialItem=specialItem,specialAction=specialAction}
+                        level=FC.Number(level,0,999) and level or nil}
                     count=count+1
                 end
             end
@@ -196,7 +182,7 @@ local function scan()
                 if count<MAX_QUESTS then
                     local old=Quests.records[id]
                     records[id]={id=id,title=old.title,status=old.status,objectives=old.objectives,observed=false,
-                        specialItem=old.specialItem,specialAction=old.specialAction,autoComplete=old.autoComplete,isTask=old.isTask,level=old.level}
+                        level=old.level}
                     count=count+1
                 end
             end

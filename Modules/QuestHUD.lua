@@ -1,9 +1,11 @@
 local _, FC = ...
-local HUD={status="Blizzard tracker in use."}
+local HUD={}
 FC.QuestHUD=HUD
 local Route,Guide,UI=FC.QuestRoute,FC.QuestGuide,FC.UI
 local GOLD,TEXT,DIM,GREEN={1,.82,.43},{1,.94,.83},{.82,.77,.66},{.70,.85,.55}
-local hud,panel,hiddenNative,nextRefresh,message,messageUntil=nil,nil,nil,0,nil,0
+local panel,launcher,trackerBar,ownedScroll,searchSizing
+local nextRefresh,message,messageUntil=0,nil,0
+local closeLog
 local folded={route={},nearby={}}
 
 local function read(fn,...)
@@ -11,24 +13,8 @@ local function read(fn,...)
     if status=="ready" then return result,true end
 end
 
-local function inGameRule(key)
-    local rule=Enum and Enum.GameRule and Enum.GameRule[key]
-    return rule and read(C_GameRules and C_GameRules.IsGameRuleActive,rule)==true
-end
-
-local function enabledReplacement()
-    return FC.IsEnabled("quests") and FC.Store.root.settings.questReplacement==true
-end
-
 local function notify(ok,reason)
     if not ok and reason then message,messageUntil=reason,GetTime()+5 end
-end
-
-local function setReplacement(enabled)
-    if not FC.Store.CanWrite() then return false,"Saved data is read-only." end
-    FC.Store.root.settings.questReplacement=enabled
-    nextRefresh=0
-    return true
 end
 
 local function atlas(texture,name)
@@ -61,35 +47,23 @@ end
 
 local function setView(view)
     Route.SetView(view)
-    if hud then hud.resetScroll=true end
     if panel then panel.resetScroll=true end
 end
 
-local function makeView(parent,isHUD)
-    local f=CreateFrame("Frame",isHUD and "ForeverCompanionQuestHUD" or nil,parent,"BackdropTemplate")
+local function makeView(parent)
+    local f=CreateFrame("Frame",nil,parent,"BackdropTemplate")
     f:SetBackdrop({bgFile="Interface/Buttons/WHITE8X8",edgeFile="Interface/Tooltips/UI-Tooltip-Border",edgeSize=12,
         insets={left=3,right=3,top=3,bottom=3}})
-    f:SetBackdropColor(.073,.055,.035,.86)
+    f:SetBackdropColor(.073,.055,.035,1)
     f:SetBackdropBorderColor(.56,.43,.25,.94)
-    f:SetClampedToScreen(isHUD)
+    f:EnableMouse(true)
     local header=f:CreateTexture(nil,"BACKGROUND",nil,1)
     header:SetPoint("TOPLEFT",4,-4); header:SetPoint("TOPRIGHT",-4,-4); header:SetHeight(30)
     if not atlas(header,"ui-questtracker-primary-objective-header") then header:SetColorTexture(.25,.16,.08,.9) end
     f.title=font(f,"title",GOLD)
-    f.title:SetPoint("TOPLEFT",12,-11); f.title:SetText(isHUD and "Objectives" or "Quest Route")
-    if isHUD then
-        f.restore=button(f,"Blizzard",function() notify(setReplacement(false)); FC.Refresh("quests") end)
-        f.restore:SetSize(65,20); f.restore:SetPoint("TOPRIGHT",-35,-8)
-        f.restore:SetScript("OnEnter",function(self)
-            GameTooltip:SetOwner(self,"ANCHOR_LEFT"); GameTooltip:SetText("Use Blizzard Tracker"); GameTooltip:Show()
-        end)
-        f.restore:SetScript("OnLeave",function(self) if GameTooltip:IsOwned(self) then GameTooltip:Hide() end end)
-        f.collapse=button(f,"-",function(self)
-            f.collapsed=not f.collapsed
-            self:SetText(f.collapsed and "+" or "-")
-        end)
-        f.collapse:SetSize(23,20); f.collapse:SetPoint("TOPRIGHT",-9,-8)
-    end
+    f.title:SetPoint("TOPLEFT",12,-11); f.title:SetText("Quest Helper")
+    f.back=button(f,"Quest Log",function() closeLog() end)
+    f.back:SetSize(80,20); f.back:SetPoint("TOPRIGHT",-9,-8)
     f.route=button(f,"Route",function() setView("route") end)
     f.nearby=button(f,"Nearby",function() setView("nearby") end)
     f.route:SetPoint("TOPLEFT",10,-37); f.nearby:SetPoint("LEFT",f.route,"RIGHT",5,0)
@@ -242,9 +216,13 @@ local function routeRows(party)
                 elseif trackable and record.observed and record.status=="A" and not target then
                     side,sideAction="Focus",function() Route.Track(key,id); Guide.Resume() end
                 end
-                out[#out+1]={kind="quest",title=(target and "> " or (record.status=="C" and "? " or ""))..record.title,
+                local title=record.level and record.level>0 and ("["..record.level.."] "..record.title) or record.title
+                out[#out+1]={kind="quest",title=(target and "> " or (record.status=="C" and "? " or ""))..title,
                     body=#body>0 and table.concat(body,"\n") or nil,active=target,side=side,sideAction=sideAction,
-                    action=function() notify(Guide.ShowDetails(id)) end}
+                    action=function()
+                        if not FC.IsCombat() then closeLog() end
+                        notify(Guide.ShowDetails(id))
+                    end}
             end
         end
     end
@@ -270,17 +248,8 @@ local function pickupRows()
 end
 
 local function paint(view,rows,summary,footer,context)
-    local collapsed=view.collapsed
-    if view==hud then
-        local height=math.min(470,math.max(255,UIParent:GetHeight()-255))
-        view:SetHeight(collapsed and 38 or height)
-    end
-    view.route:SetShown(not collapsed); view.nearby:SetShown(not collapsed)
-    view.context:SetShown(not collapsed); view.scroll:SetShown(not collapsed)
-    view.party:SetShown(not collapsed and FC.IsEnabled("party"))
-    view.summary:SetShown(not collapsed and summary~=nil)
-    view.footer:SetShown(not collapsed)
-    if collapsed then return end
+    view.party:SetShown(FC.IsEnabled("party"))
+    view.summary:SetShown(summary~=nil)
     view.route:SetEnabled(Route.view~="route"); view.nearby:SetEnabled(Route.view~="nearby")
     view.context:SetWidth(view:GetWidth()-24); view.footer:SetWidth(view:GetWidth()-24)
     view.summary:SetWidth(view:GetWidth()-158)
@@ -289,9 +258,7 @@ local function paint(view,rows,summary,footer,context)
 end
 
 local function repaint()
-    local showHUD=hud and hud:IsShown()
-    local showPanel=panel and panel:IsVisible()
-    if not showHUD and not showPanel then return end
+    if not panel or not panel:IsVisible() then return end
     local session,party=sessionNow()
     local rows=Route.view=="route" and routeRows(party) or pickupRows()
     local summary
@@ -306,147 +273,245 @@ local function repaint()
     if count then context=context.."  ·  "..count..(FC.Number(limit,1,1000) and "/"..limit or "").." in quest log" end
     local footer=(GetTime()<messageUntil and message) or (FC.IsCombat() and "Quest and map updates resume after combat.") or Guide.Status()
         or (Route.view=="nearby" and "Select a pickup to show it on the map." or "Select an area to track its nearest quest.")
-    if showHUD then paint(hud,rows,summary,footer,context) end
-    if showPanel then paint(panel,rows,summary,footer,context) end
+    paint(panel,rows,summary,footer,context)
 end
 
-local function protectedActivity(native)
-    local combat=FC.IsCombat()
-    if combat then return "Combat in progress." end
-    if inGameRule("ObjectiveTrackerDisabled") then return "The game disabled the tracker here." end
-    local instance,known=read(IsInInstance)
-    if not known or instance then return "Blizzard tracker in use for this instance." end
-    if EditModeManagerFrame and read(EditModeManagerFrame.IsEditModeActive,EditModeManagerFrame)==true then
-        return "Blizzard tracker in use in Edit Mode."
-    end
-    if InputUtil and read(InputUtil.IsGamepadUIEnabled)==true then return "Blizzard tracker in use for controller navigation." end
-    if not native or type(native.ForEachModule)~="function" or type(native.Update)~="function" then
-        return "The Blizzard tracker is not ready."
-    end
-    local protected,checked=read(native.IsProtected,native)
-    if not checked or protected then return "The client has protected the Blizzard tracker." end
-    if not FC.Quests.membershipComplete then return "Quest log incomplete. Expand collapsed quest log sections." end
-    for _,record in pairs(FC.Quests.records) do
-        if record.specialItem~=false or record.specialAction or record.isTask or (record.autoComplete and record.status=="C") then
-            return "Blizzard tracker in use for a quest item or special quest action."
-        end
-    end
-    local popups=read(GetNumAutoQuestPopUps)
-    if FC.Number(popups,1,1000) then return "Blizzard tracker in use for a quest pop-up." end
-    local unsupported=false
-    local status=FC.SafeRead(native.ForEachModule,native,function(module)
-        if module~=QuestObjectiveTracker and module~=CampaignQuestObjectiveTracker then
-            local has,ok=read(module.HasContents,module)
-            local truncated=read(module.IsTruncated,module)
-            if not ok or has or truncated then unsupported=true end
-        end
-    end)
-    if status~="ready" or unsupported then return "Blizzard tracker in use for other objectives." end
+local function gamepad()
+    return InputUtil and read(InputUtil.IsGamepadUIEnabled)==true
 end
 
-local function restoreNative()
-    if not hiddenNative then return true end
-    if FC.IsCombat() then return false end
-    local native=hiddenNative
-    if not inGameRule("ObjectiveTrackerDisabled") then
-        local status=FC.SafeRead(native.Update,native,false)
-        if status~="ready" then status=FC.SafeRead(native.Show,native) end
-        if status~="ready" then return false end
+local function restoreSearch()
+    if not searchSizing then return end
+    local search=searchSizing
+    searchSizing=nil
+    if search.box:GetWidth()==search.applied then search.box:SetWidth(search.original) end
+end
+
+local function logFrames()
+    local log=QuestMapFrame
+    local quests=log and log.QuestsFrame
+    return log,quests,quests and quests.ScrollFrame,log and log.DetailsFrame
+end
+
+local closePending,menuHooked
+
+closeLog=function()
+    if not ownedScroll then return true end
+    if FC.IsCombat() then closePending=true; return false end
+    local scroll=ownedScroll
+    local _,_,current,details=logFrames()
+    if scroll==current and not (details and details:IsShown()) and not scroll:IsShown() then
+        local status=FC.SafeRead(scroll.Show,scroll)
+        if status~="ready" and not scroll:IsShown() then closePending=true; return false end
     end
-    hiddenNative=nil
+    ownedScroll,closePending=nil,nil
+    if panel then panel:Hide() end
+    nextRefresh=0
     return true
 end
 
-local function alignHUD(native)
-    if read(native.IsShown,native)~=true then return end
-    local right,top=read(native.GetRight,native),read(native.GetTop,native)
-    local scale,parentScale=read(native.GetEffectiveScale,native),read(UIParent.GetEffectiveScale,UIParent)
-    if type(right)~="number" or type(top)~="number" or type(scale)~="number" or type(parentScale)~="number"
-        or parentScale<=0 then return end
-    local x=right*scale/parentScale-UIParent:GetWidth()
-    local y=top*scale/parentScale-UIParent:GetHeight()
-    if x==x and y==y and x<=0 and x>=-UIParent:GetWidth() and y<=0 and y>=-UIParent:GetHeight() then
-        hud:ClearAllPoints()
-        hud:SetPoint("TOPRIGHT",UIParent,"TOPRIGHT",x,y)
+function HUD.OpenLog(view)
+    if not FC.IsEnabled("quests") or FC.IsCombat() or gamepad() then
+        return false,"Quest Helper is unavailable here."
     end
-end
-
-local function syncVisibility()
-    local native=ObjectiveTrackerFrame
-    if FC.IsCombat() then
-        if hud and (read(native and native.IsShown,native)==true or (not enabledReplacement() and not hiddenNative)) then hud:Hide() end
-        return "Tracker changes resume after combat."
+    local log,quests,scroll,details=logFrames()
+    if not log or not log:IsVisible() then
+        FC.SafeRead(OpenQuestLog)
+        log,quests,scroll,details=logFrames()
     end
-    local reason=enabledReplacement() and protectedActivity(native) or nil
-    if not enabledReplacement() then reason="Blizzard tracker in use." end
-    if reason then
-        if not restoreNative() then return "Waiting for Blizzard's tracker to restore." end
-        if hud then hud:Hide() end
-        return reason
+    if not log or not log:IsVisible() or not quests or not scroll then
+        return false,"Open the Quest and Map Log to use Quest Helper."
     end
-    if not hud then
-        hud=makeView(UIParent,true)
-        hud:SetWidth(322)
-        hud:SetPoint("TOPRIGHT",UIParent,"TOPRIGHT",-38,-231)
+    if not quests:IsShown() and QuestLogDisplayMode then
+        FC.SafeRead(log.SetDisplayMode,log,QuestLogDisplayMode.Quests)
     end
-    alignHUD(native)
-    hud:Show()
-    if read(native.IsShown,native)==true then
-        hiddenNative=native
-        local status=FC.SafeRead(native.Hide,native)
-        if status~="ready" or read(native.IsShown,native)~=false then
-            if restoreNative() then hud:Hide() end
-            return "The client kept Blizzard's tracker visible."
+    if details and details:IsShown() then FC.SafeRead(QuestMapFrame_CloseQuestDetails) end
+    if not quests:IsVisible() or (not ownedScroll and not scroll:IsVisible()) then
+        return false,"Open the Quests tab to use Quest Helper."
+    end
+    if view then setView(view) end
+    if not panel then
+        panel=makeView(quests)
+        panel:SetPoint("TOPLEFT",scroll,"TOPLEFT",-1,25)
+        panel:SetPoint("BOTTOMRIGHT",scroll,"BOTTOMRIGHT",17,1)
+        panel:SetFrameLevel(scroll:GetFrameLevel()+5)
+    end
+    if not ownedScroll then
+        restoreSearch()
+        if launcher then launcher:Hide() end
+        ownedScroll=scroll
+        if FC.SafeRead(scroll.Hide,scroll)~="ready" or scroll:IsShown() then
+            closeLog()
+            return false,"The quest log kept its quest list visible."
         end
     end
-    return "Quest Helper is replacing the Blizzard tracker."
+    panel:Show()
+    if UI.window and UI.window:IsShown() then UI.window:Hide() end
+    nextRefresh=0
+    return true
 end
 
-function HUD.Status() return HUD.status end
+local function syncLog(running)
+    local log,quests,scroll,details=logFrames()
+    if ownedScroll then
+        local detailsShown=details and details:IsShown()
+        if not running or closePending or not quests or not quests:IsVisible()
+            or gamepad() or detailsShown or ownedScroll:IsShown() then
+            if panel and (detailsShown or ownedScroll:IsShown()) then panel:Hide() end
+            closeLog()
+        end
+    end
+    if FC.IsCombat() then return end
+    if running and not menuHooked and Menu and type(Menu.ModifyMenu)=="function" then
+        Menu.ModifyMenu("MENU_QUEST_MAP_FRAME_SETTINGS",function(_,root)
+            if FC.IsEnabled("quests") and not gamepad() and not FC.IsCombat() then
+                root:CreateButton("Quest Helper",function() notify(HUD.OpenLog()) end)
+            end
+        end)
+        menuHooked=true
+    end
+    local search=scroll and scroll.SearchBox
+    local visible=running and not gamepad() and log and log:IsVisible() and search and search:IsVisible()
+        and not (QuestLogCount and QuestLogCount:IsVisible()) and not ownedScroll
+    if not visible then
+        if launcher then launcher:Hide() end
+        restoreSearch()
+        return
+    end
+    local width=search:GetWidth()
+    if not searchSizing or searchSizing.box~=search or width~=searchSizing.applied then
+        restoreSearch()
+        if width<185 then if launcher then launcher:Hide() end; return end
+        searchSizing={box=search,original=width,applied=width-102}
+        search:SetWidth(searchSizing.applied)
+        if math.abs(search:GetWidth()-searchSizing.applied)>.5 then
+            search:SetWidth(width)
+            searchSizing=nil
+            if launcher then launcher:Hide() end
+            return
+        end
+    end
+    if not launcher then
+        launcher=button(scroll,"Quest Helper",function() notify(HUD.OpenLog()) end)
+        launcher:SetSize(98,20)
+        launcher:SetPoint("LEFT",search,"RIGHT",4,0)
+    end
+    launcher:Show()
+end
+
+local function chooseArea(button)
+    if FC.IsCombat() or not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+    MenuUtil.CreateContextMenu(button,function(_,root)
+        root:CreateTitle("Track a quest area")
+        if Route.area then
+            root:CreateButton("Stop route",function() Route.Stop(); Guide.Stop(); nextRefresh=0 end)
+        end
+        for _,group in ipairs(Route.sections) do
+            if group.mapID then
+                local key=group.key
+                root:CreateButton(group.label.." ("..#group.rows..")",function()
+                    Route.Track(key)
+                    Guide.Resume()
+                    folded.route[key]=true
+                    nextRefresh=0
+                end)
+            end
+        end
+        root:CreateButton("Open Quest Route",function() notify(HUD.OpenLog("route")) end)
+    end)
+end
+
+local function makeTrackerBar(native)
+    local bar=CreateFrame("Frame",nil,native)
+    -- Forever moves its header below the combined top padding.
+    bar:SetPoint("BOTTOMLEFT",native.Header,"TOPLEFT",9,2)
+    bar:SetPoint("BOTTOMRIGHT",native.Header,"TOPRIGHT",-9,2)
+    bar.padding=0
+    function bar:GetTopPadding() return self.padding end
+    bar.route=button(bar,"Route",function() notify(HUD.OpenLog("route")) end)
+    bar.route:SetSize(62,19); bar.route:SetPoint("TOPLEFT")
+    bar.nearby=button(bar,"Nearby",function() notify(HUD.OpenLog("nearby")) end)
+    bar.nearby:SetSize(62,19); bar.nearby:SetPoint("LEFT",bar.route,"RIGHT",5,0)
+    bar.area=button(bar,"Track Area",chooseArea)
+    bar.area:SetSize(80,19); bar.area:SetPoint("LEFT",bar.nearby,"RIGHT",5,0)
+    bar.target=font(bar,"small",GOLD)
+    bar.target:SetPoint("TOPLEFT",1,-23); bar.target:SetPoint("TOPRIGHT",-1,-23)
+    bar.target:SetWordWrap(false)
+    native:AddTopPaddingProvider(bar)
+    return bar
+end
+
+local function syncTracker(running)
+    if FC.IsCombat() then return end
+    local native=ObjectiveTrackerFrame
+    if not native or not native.Header or type(native.AddTopPaddingProvider)~="function" or type(native.MarkDirty)~="function" then return end
+    local editing=EditModeManagerFrame and read(EditModeManagerFrame.IsEditModeActive,EditModeManagerFrame)==true
+    local allowed=running and not gamepad() and not editing and read(native.IsCollapsed,native)==false
+        and read(native.ShouldShowHeader,native)~=false
+    if not trackerBar and allowed then trackerBar=makeTrackerBar(native) end
+    if not trackerBar then return end
+    local target=Route.Target()
+    local group=Route.area and Route.byKey[Route.area]
+    local label
+    if target then
+        label="Tracking: "..target.record.title
+        local _,party=sessionNow()
+        if party then
+            local summary=FC.Quests.GroupSummary(target.id,party)
+            if summary then label=label.." · "..summary.text end
+        end
+    elseif group or Route.area then label="Route: "..(group and group.label or "waiting for quest data") end
+    local padding=allowed and (label and 41 or 24) or 0
+    trackerBar.target:SetText(label or "")
+    trackerBar.target:SetShown(label~=nil)
+    trackerBar.area:SetShown(trackerBar:GetWidth()>=214 and MenuUtil and type(MenuUtil.CreateContextMenu)=="function" or false)
+    trackerBar:SetHeight(math.max(1,padding))
+    trackerBar:SetShown(allowed)
+    if trackerBar.padding~=padding then
+        trackerBar.padding=padding
+        native:MarkDirty()
+    end
+end
+
+function HUD.Status()
+    if not FC.IsEnabled("quests") then return "Quest Helper is disabled." end
+    return HUD.status or "Quest Helper uses the Objective Tracker and Quest and Map Log."
+end
 
 function HUD.Tick()
     local running=FC.IsEnabled("quests")
-    if not running and not hiddenNative and not Guide.HasPending() then return end
+    if not running and not ownedScroll and not searchSizing and not (trackerBar and trackerBar.padding>0)
+        and not Guide.HasPending() then return end
     local now=GetTime()
     if now<nextRefresh then return end
     nextRefresh=now+.65
-    local previous=HUD.status
-    local status,result=pcall(function()
+    local status,err=pcall(function()
         if running and not FC.IsCombat() then
             if FC.QuestData then FC.QuestData.Tick() end
             Route.Tick()
             if Route.state~="waiting" then Guide.Tick(Route.Target()) end
         elseif not running then Guide.Stop() end
-        local result=syncVisibility()
+        syncLog(running)
+        syncTracker(running)
         if running then repaint() end
-        return result
     end)
     if not status then
-        FC.RecordDiagnostic("Quest Helper",result)
-        if restoreNative() and hud then hud:Hide() end
-        result="Quest Helper paused after a client error. See /fc diagnostics."
+        FC.RecordDiagnostic("Quest Helper",err)
+        pcall(closeLog)
+        pcall(syncLog,false)
+        pcall(syncTracker,false)
+        HUD.status="Quest Helper paused after a client error. See /fc diagnostics."
         nextRefresh=now+3
+    else
+        HUD.status=nil
     end
-    HUD.status=result
-    if previous~=result then FC.Refresh("quests") end
 end
-
-function HUD.HidePanel() if panel then panel:Hide() end end
 
 function HUD.Render(parent)
     UI.Label(parent,"Quest Helper",0,0,730,true)
-    UI.Label(parent,HUD.status,0,25,730)
-    UI.Check(parent,"Preview Quest Helper in place of the Blizzard Objective Tracker",0,48,enabledReplacement(),function(enabled)
-        UI.Result(setReplacement(enabled))
-    end,FC.Store.CanWrite())
-    if not panel then
-        panel=makeView(parent,false)
-        panel:SetPoint("TOPLEFT",0,-85)
-        panel:SetSize(730,365)
-    end
-    panel:Show()
-    UI.Height(465)
-    repaint()
+    UI.Label(parent,"Open Route or Nearby from the Objective Tracker, or select Quest Helper in the Quest and Map Log.",0,27,730)
+    UI.Button(parent,"Open Quest Helper",0,58,170,function() UI.Result(HUD.OpenLog()) end)
+    UI.Height(430)
 end
 
 local locationEvents={QUEST_LOG_UPDATE=true,QUEST_ACCEPTED=true,QUEST_REMOVED=true,QUEST_TURNED_IN=true,QUEST_DATA_LOAD_RESULT=true,
@@ -472,10 +537,10 @@ local function disable()
     Route.Stop(true)
     if FC.QuestData then FC.QuestData.Reset() end
     Guide.Stop()
-    HUD.HidePanel()
-    restoreNative()
-    if hud and not hiddenNative then hud:Hide() end
-    HUD.status=hiddenNative and "Tracker changes resume after combat." or "Blizzard tracker in use."
+    closeLog()
+    syncLog(false)
+    syncTracker(false)
+    nextRefresh=0
 end
 
 FC.RegisterModule("quests",{title="Quest Helper",Render=HUD.Render,Enable=enable,Disable=disable,OnEvent=onEvent})

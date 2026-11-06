@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.10-prototype — Native quest integration
+
+- Added Route, Nearby, area tracking and the active route target to Blizzard's Objective Tracker.
+- Moved Route and Nearby into the Quest and Map Log, with a return button for the native quest list.
+
 ## 0.1.9-prototype — Quest Helper
 
 - Added Nearby quest pickups and Route sections grouped by objective area, with nearest-quest tracking, automatic advance and ready turn-ins.

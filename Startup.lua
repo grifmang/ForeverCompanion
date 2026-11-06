@@ -44,6 +44,9 @@ local function start()
         if command=="help" then FC.Print("/fc | /fc legacy | /fc wallet | /fc items | /fc quests | /fc party | /fc settings | /fc updates | /fc diagnostics")
         elseif command=="updates" and FC.Updates then FC.Updates.PrintStatus()
         elseif command=="diagnostics" then diagnostics()
+        elseif command=="quests" and FC.IsEnabled("quests") then
+            local status,opened=FC.SafeRead(FC.QuestHUD.OpenLog)
+            if status~="ready" or not opened then FC.UI.Open("quests") end
         elseif command=="" or FC.modules[command] or command=="settings" then FC.UI.Open(command~="" and command or nil)
         else FC.Print("Unknown command. Use /fc help.") end
     end
@@ -78,7 +81,7 @@ events:SetScript("OnUpdate",function(_,delta)
     if started then
         local questOK,questError=pcall(FC.Quests.Tick)
         if not questOK then FC.RecordDiagnostic("Quest log",questError) end
-        if FC.QuestHUD then FC.QuestHUD.Tick() end -- Restores the native tracker even after the module is disabled.
+        if FC.QuestHUD then FC.QuestHUD.Tick() end -- Restore native quest-log layout after deferred cleanup.
     end
     if started and FC.IsEnabled("party") then
         local ok,err=pcall(FC.PartyProtocol.Tick)

@@ -73,7 +73,6 @@ function UI.Render()
         UI.footer:SetText(FC.Store.status or UI.message)
         return
     end
-    if FC.QuestHUD then FC.QuestHUD.HidePanel() end
     UI.Begin(UI.child)
     if not FC.Store.Character() then
         UI.Label(UI.child, "Character data is not available yet. Try again after entering the world.", 0, 0)

@@ -86,10 +86,6 @@ function Store.Initialize()
         quarantine(root, root.settings.partySharing)
         root.settings.partySharing = false
     end
-    if root.settings.questReplacement ~= nil and type(root.settings.questReplacement) ~= "boolean" then
-        quarantine(root, root.settings.questReplacement)
-        root.settings.questReplacement = false
-    end
     for _, key in ipairs(FC.keys) do
         if type(root.settings.enabled[key]) ~= "boolean" then
             if root.settings.enabled[key] ~= nil then quarantine(root, root.settings.enabled[key]) end

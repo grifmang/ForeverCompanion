@@ -1,6 +1,6 @@
 # Forever Companion
 
-Version 0.1.9-prototype — a WoW: Forever addon suite with five optional modules.
+Version 0.1.10-prototype — a WoW: Forever addon suite with five optional modules.
 
 **Status:** Source has been checked with a Lua 5.1 syntax parser. Real-client loading, SavedVariables persistence, tooltip behavior, Legacy data and two-player synchronization still need verification. This is a prototype, not a launch-ready release.
 
@@ -54,13 +54,13 @@ Drag the window to move it. Escape closes it. Fields do not take focus automatic
 
 ## Quest Helper
 
-Open **`/fc quests`**. **Nearby** shows quest pickups grouped by giver or map location. Select a pickup to open the map. When the work area is known, the list shows which quests can be done together. **Likely available** means you may still need a prerequisite; **Confirmed offer** means the quest was recently offered in the native NPC dialogue. Talk to the NPC to accept it.
+Open **Quest Helper** in the Quest and Map Log, use **Route** or **Nearby** in the Objective Tracker, or type **`/fc quests`**. **Nearby** groups pickups by giver or map location. Select a pickup to open the map. When the work area is known, the list shows which quests can be done together. **Likely available** means you may still need a prerequisite. **Confirmed offer** means the native NPC dialogue recently offered the quest. Talk to the NPC to accept it.
 
 **Route** organizes accepted quests by the location of their current objectives. Choose **Track** beside an area to start at its nearest known quest. The current target stays selected as you move, and the route advances when you finish its work in that area. Use **Focus** to select a particular quest and **Stop** to end the route. Finished quests move to **Turn in**. Instanced quests and quests without usable locations remain visible. A tilde marks an approximate straight-line distance. If the quest log is incomplete, expand its collapsed sections in Blizzard's quest log.
 
 For wider pickup and objective coverage, separately install [QuestieDB Forever](https://github.com/Questie/QuestieDB/releases). Quest Helper also reads offers and map data from the game without QuestieDB. Coverage varies, especially for new Forever quests, and the add-on leaves missing locations unknown. A map guidance message explains if the client cannot place a pin or you already have another destination selected. Quest Helper does not alter your quest watch list.
 
-Use **Preview Quest Helper in place of the Blizzard Objective Tracker** to try the same list on the HUD. Replacement starts off by default. The **Blizzard** button returns to the original tracker. The game can keep or restore its own tracker for protected actions, instances, other objective types, Edit Mode or controller navigation; switches that need to wait for combat are deferred. The original Quest Log and World Map remain available.
+**Track Area** in the Objective Tracker lets you select or stop a route there, and the tracker shows your active target above the native objectives. In the Quest and Map Log, choose **Quest Log** to return to the regular quest list or select a quest title to open its native details. If the search bar has no room for the **Quest Helper** button, use the quest log settings menu.
 
 In an active Adventure Together session, quest rows show party readiness and unknown reports, with your checklist progress at the bottom. The two modules can run independently. Quest Helper doesn't share your location, route or pickup list.
 

@@ -10,7 +10,7 @@ These checks establish source syntax and package integrity. They do not establis
 
 ## Current source boundaries
 
-- Quest Helper adds a shared quest observer, bounded optional QuestieDB lookups, native map offers and a route HUD. It uses the Forever quest log's explicit `C_QuestLog.IsFailed` and completion APIs, keeps route choices local, and defers protected tracker changes in combat. The live HUD replacement preview is off by default. The browser design demo verified the intended interaction with sample data; it is not a runtime test of the add-on.
+- Quest Helper uses the Objective Tracker's top padding provider for its route controls and opens Route and Nearby in the Quest and Map Log's quest pane. It keeps route choices local and defers changes to native layout during combat. In-game placement and input remain part of the live acceptance walkthrough.
 
 - Quest logs are read automatically. Partial/collapsed/restricted observations remain unknown; completion means ready for turn-in. Remote status is bound to current roster/session/channel/member identity and expires. Normal/campaign Objective Tracker modules use native-managed lines; Camelot's map quest list uses pooled quest entries, measured spacing and separate owned tooltips.
 - The earlier0.1.6 adapter and book-style preview incorrectly assumed Vanilla QuestLogFrame was loaded. Actual Camelot flavor rules exclude it. Version0.1.7 corrected the target to Mainline QuestMapFrame with Camelot overrides. The old preview is not evidence of the client's layout.
