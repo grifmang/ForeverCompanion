@@ -5,7 +5,7 @@ local Route,Guide,UI=FC.QuestRoute,FC.QuestGuide,FC.UI
 local GOLD,TEXT,DIM,GREEN={1,.82,.43},{1,.94,.83},{.82,.77,.66},{.70,.85,.55}
 local panel,launcher,trackerBar,ownedScroll,searchSizing
 local nextRefresh,message,messageUntil=0,nil,0
-local closeLog
+local closeLog,openedThisVisit
 local folded={route={},nearby={}}
 
 local function read(fn,...)
@@ -62,7 +62,10 @@ local function makeView(parent)
     if not atlas(header,"ui-questtracker-primary-objective-header") then header:SetColorTexture(.25,.16,.08,.9) end
     f.title=font(f,"title",GOLD)
     f.title:SetPoint("TOPLEFT",12,-11); f.title:SetText("Quest Helper")
-    f.back=button(f,"Quest Log",function() closeLog() end)
+    f.back=button(f,"Quest Log",function()
+        openedThisVisit=true
+        closeLog()
+    end)
     f.back:SetSize(80,20); f.back:SetPoint("TOPRIGHT",-9,-8)
     f.route=button(f,"Route",function() setView("route") end)
     f.nearby=button(f,"Nearby",function() setView("nearby") end)
@@ -293,7 +296,7 @@ local function logFrames()
     return log,quests,quests and quests.ScrollFrame,log and log.DetailsFrame
 end
 
-local closePending,menuHooked
+local closePending,menuHooked,observedLog
 
 closeLog=function()
     if not ownedScroll then return true end
@@ -306,6 +309,28 @@ closeLog=function()
     end
     ownedScroll,closePending=nil,nil
     if panel then panel:Hide() end
+    nextRefresh=0
+    return true
+end
+
+local function showLogPane(quests,scroll)
+    openedThisVisit=true
+    if not panel then
+        panel=makeView(quests)
+        panel:SetPoint("TOPLEFT",scroll,"TOPLEFT",-1,25)
+        panel:SetPoint("BOTTOMRIGHT",scroll,"BOTTOMRIGHT",17,1)
+        panel:SetFrameLevel(scroll:GetFrameLevel()+5)
+    end
+    if not ownedScroll then
+        restoreSearch()
+        if launcher then launcher:Hide() end
+        ownedScroll=scroll
+        if FC.SafeRead(scroll.Hide,scroll)~="ready" or scroll:IsShown() then
+            closeLog()
+            return false,"The quest log kept its quest list visible."
+        end
+    end
+    panel:Show()
     nextRefresh=0
     return true
 end
@@ -330,29 +355,23 @@ function HUD.OpenLog(view)
         return false,"Open the Quests tab to use Quest Helper."
     end
     if view then setView(view) end
-    if not panel then
-        panel=makeView(quests)
-        panel:SetPoint("TOPLEFT",scroll,"TOPLEFT",-1,25)
-        panel:SetPoint("BOTTOMRIGHT",scroll,"BOTTOMRIGHT",17,1)
-        panel:SetFrameLevel(scroll:GetFrameLevel()+5)
-    end
-    if not ownedScroll then
-        restoreSearch()
-        if launcher then launcher:Hide() end
-        ownedScroll=scroll
-        if FC.SafeRead(scroll.Hide,scroll)~="ready" or scroll:IsShown() then
-            closeLog()
-            return false,"The quest log kept its quest list visible."
-        end
-    end
-    panel:Show()
-    if UI.window and UI.window:IsShown() then UI.window:Hide() end
-    nextRefresh=0
-    return true
+    local ok,reason=showLogPane(quests,scroll)
+    if ok and UI.window and UI.window:IsShown() then UI.window:Hide() end
+    return ok,reason
 end
 
 local function syncLog(running)
     local log,quests,scroll,details=logFrames()
+    local visibleLog=log and log:IsVisible()
+    if not running or not visibleLog then openedThisVisit=nil end
+    if running and log and observedLog~=log and not FC.IsCombat() then
+        log:HookScript("OnHide",function()
+            openedThisVisit=nil
+            nextRefresh=0
+        end)
+        log:HookScript("OnShow",function() nextRefresh=0 end)
+        observedLog=log
+    end
     if ownedScroll then
         local detailsShown=details and details:IsShown()
         if not running or closePending or not quests or not quests:IsVisible()
@@ -362,6 +381,16 @@ local function syncLog(running)
         end
     end
     if FC.IsCombat() then return end
+    -- Native quest details and other map tabs keep their normal navigation.
+    -- Returning to the stock list is respected until the pane closes.
+    if running and visibleLog and not openedThisVisit and quests and quests:IsVisible() then
+        if details and details:IsShown() then
+            openedThisVisit=true
+        elseif not gamepad() and scroll and scroll:IsVisible() and not ownedScroll then
+            local ok=showLogPane(quests,scroll)
+            if ok then return end
+        end
+    end
     if running and not menuHooked and Menu and type(Menu.ModifyMenu)=="function" then
         Menu.ModifyMenu("MENU_QUEST_MAP_FRAME_SETTINGS",function(_,root)
             if FC.IsEnabled("quests") and not gamepad() and not FC.IsCombat() then
@@ -422,10 +451,13 @@ local function chooseArea(button)
 end
 
 local function makeTrackerBar(native)
-    local bar=CreateFrame("Frame",nil,native)
+    -- The tracker hides itself with no watched objectives. Keep the controls
+    -- on its parent so Nearby can still be opened from the same spot.
+    local bar=CreateFrame("Frame",nil,native:GetParent())
     -- Forever moves its header below the combined top padding.
     bar:SetPoint("BOTTOMLEFT",native.Header,"TOPLEFT",9,2)
     bar:SetPoint("BOTTOMRIGHT",native.Header,"TOPRIGHT",-9,2)
+    bar:SetFrameLevel(native.Header:GetFrameLevel()+1)
     bar.padding=0
     function bar:GetTopPadding() return self.padding end
     bar.route=button(bar,"Route",function() notify(HUD.OpenLog("route")) end)
@@ -446,7 +478,7 @@ local function syncTracker(running)
     local native=ObjectiveTrackerFrame
     if not native or not native.Header or type(native.AddTopPaddingProvider)~="function" or type(native.MarkDirty)~="function" then return end
     local editing=EditModeManagerFrame and read(EditModeManagerFrame.IsEditModeActive,EditModeManagerFrame)==true
-    local allowed=running and not gamepad() and not editing and read(native.IsCollapsed,native)==false
+    local allowed=running and not gamepad() and not editing
         and read(native.ShouldShowHeader,native)~=false
     if not trackerBar and allowed then trackerBar=makeTrackerBar(native) end
     if not trackerBar then return end
@@ -509,7 +541,7 @@ end
 
 function HUD.Render(parent)
     UI.Label(parent,"Quest Helper",0,0,730,true)
-    UI.Label(parent,"Open Route or Nearby from the Objective Tracker, or select Quest Helper in the Quest and Map Log.",0,27,730)
+    UI.Label(parent,"Quest Helper opens with the Quest and Map Log. Route and Nearby are also in the Objective Tracker.",0,27,730)
     UI.Button(parent,"Open Quest Helper",0,58,170,function() UI.Result(HUD.OpenLog()) end)
     UI.Height(430)
 end

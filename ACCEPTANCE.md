@@ -1,6 +1,6 @@
 # Forever Companion real-client acceptance
 
-Release: 0.1.10-prototype builds. **This is a walkthrough, not evidence of an in-game pass.** Static syntax and packaging results are reported in VERIFICATION.md inside the addon folder.
+Release: 0.1.11-prototype builds. **This is a walkthrough, not evidence of an in-game pass.** Static syntax and packaging results are reported in VERIFICATION.md inside the addon folder.
 
 Use one Forever release character and one additional real client for party sharing. Reuse those two characters throughout; no device matrix or lower-level harness is required.
 
@@ -20,7 +20,7 @@ Use one Forever release character and one additional real client for party shari
 
 ## Quest Helper — one leveling route
 
-- [ ] Open the Quest and Map Log and click Quest Helper. Compare Nearby offers with a nearby NPC. If QuestieDB Forever is available, check a hub with multiple pickups and verify shared work area hints, including one pair from different givers. Confirm a live offer and accept it normally. The pickup disappears and becomes a Route row. Verify the no-provider state is usable.
+- [ ] With Quest Helper enabled, open the Quest and Map Log and verify the helper opens automatically. Choose Quest Log, verify the stock list stays open for the current visit, then close and reopen the log. Check that Quest Helper returns automatically and that opening native quest details still shows those details. With no watched quests, confirm Nearby is available from the tracker. Compare Nearby offers with a nearby NPC, then accept an offer and check it moves into Route. If QuestieDB Forever is available, check that two pickups from different givers can show a shared work area.
 - [ ] Use accepted quests with two separate work areas. Verify the list groups by objective destination rather than by quest giver. Track an area and compare the first target with known nearby positions. Move toward another quest without finishing the current one; the target stays selected. Complete the work for one quest, check that the nearest remaining quest is selected, and check that the finished quest appears in Turn in. When only this area's work is complete, keep the quest in its other section. A quest without coordinates remains visible.
 - [ ] Open quest details, place a pickup or turn-in map marker, focus a quest manually and stop the route. Verify a pre-existing user pin is retained, and prior quest guidance is restored only if Quest Helper still owns the active selection. Try native quest POIs on and off without changing unrelated settings. Collapse a Blizzard quest log section; hidden entries must not be treated as completed or abandoned.
 - [ ] Open Route and Nearby from the native Objective Tracker. Use Track Area, verify the active target appears at the top of the tracker and check that objectives do not overlap the controls. Collapse and expand the tracker, open a quest detail from the helper, return to the native quest list, switch map tabs, and disable and re-enable Quest Helper. Verify the quest log search width, native quest items and ordinary objective controls remain usable after disabling and after combat.

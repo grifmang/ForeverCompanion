@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.11-prototype — Quest Helper on by default
+
+- Open Quest Helper automatically when the Quest and Map Log opens. The native quest list remains available for the rest of that visit.
+- Keep Route and Nearby visible at the Objective Tracker with an empty watch list.
+
 ## 0.1.10-prototype — Native quest integration
 
 - Added Route, Nearby, area tracking and the active route target to Blizzard's Objective Tracker.
