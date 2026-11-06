@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.15-prototype — Objective Tracker refresh recovery
+
+- Recover a stalled Blizzard Objective Tracker refresh outside combat. Run the existing Blizzard callback once so the tracker redraws current quest counts and can schedule later updates.
+
 ## 0.1.14-prototype — Native quest tracking
 
 - Focus, Track and route advance watch the active quest in Blizzard's Quest Log and Objective Tracker.

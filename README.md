@@ -1,6 +1,6 @@
 # Forever Companion
 
-Version 0.1.14-prototype — a WoW: Forever addon suite with five optional modules.
+Version 0.1.15-prototype — a WoW: Forever addon suite with five optional modules.
 
 **Status:** Source has been checked with a Lua 5.1 syntax parser. Real-client loading, SavedVariables persistence, tooltip behavior, Legacy data and two-player synchronization still need verification. This is a prototype, not a launch-ready release.
 

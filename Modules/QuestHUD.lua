@@ -6,6 +6,8 @@ local GOLD,TEXT,DIM,GREEN={1,.82,.43},{1,.94,.83},{.82,.77,.66},{.70,.85,.55}
 local panel,launcher,trackerBar,ownedScroll,searchSizing
 local nextRefresh,message,messageUntil=0,nil,0
 local lastQuestRevision
+local trackerPendingSince,trackerRecoveryAttempted
+local trackerLayoutHooks={}
 local closeLog,openedThisVisit
 local folded={route={},nearby={}}
 
@@ -491,11 +493,56 @@ local function makeTrackerBar(native)
     return bar
 end
 
+local function observeQuestLayout(module,native)
+    if not FC.Readable(module) or not module then return false end
+    local parent=module.parentContainer
+    if not FC.Readable(parent) or parent~=native then return false end
+    if trackerLayoutHooks[module]==nil then
+        if type(hooksecurefunc)~="function" or type(module.EndLayout)~="function" then return false end
+        -- A layout can finish and be queued again between our polls.
+        local ok,err=pcall(hooksecurefunc,module,"EndLayout",function() trackerPendingSince=nil end)
+        trackerLayoutHooks[module]=ok
+        if not ok then FC.RecordDiagnostic("Objective tracker layout observation",err) end
+    end
+    return trackerLayoutHooks[module] and read(module.IsDirty,module)==true
+end
+
+local function recoverTrackerLayout(native,enabled)
+    local pending=enabled and native.dirty
+    local regularPending,campaignPending
+    if FC.Readable(pending) and pending==true then
+        regularPending=observeQuestLayout(QuestObjectiveTracker,native)
+        campaignPending=observeQuestLayout(CampaignQuestObjectiveTracker,native)
+    end
+    if not regularPending and not campaignPending then
+        trackerPendingSince,trackerRecoveryAttempted=nil,nil
+        return
+    end
+    -- Blizzard queues the layout for the next frame and only clears its dirty
+    -- flag after the callback finishes. A stuck flag prevents MarkDirty from
+    -- queueing any more layouts. Give the normal queue time to run first.
+    local now=GetTime()
+    trackerPendingSince=trackerPendingSince or now
+    if trackerRecoveryAttempted or now-trackerPendingSince<1 then return end
+    local callback=native.dirtyCallback
+    if not FC.Readable(callback) or type(callback)~="function" then return end
+    trackerRecoveryAttempted=true
+    local ok,err=pcall(callback)
+    if not ok then FC.RecordDiagnostic("Objective tracker layout recovery",err)
+    else
+        local stillPending=native.dirty
+        if FC.Readable(stillPending) and stillPending~=true then
+            trackerPendingSince,trackerRecoveryAttempted=nil,nil
+        end
+    end
+end
+
 local function syncTracker(running)
-    if FC.IsCombat() then return end
+    if FC.IsCombat() then trackerPendingSince=nil; return end
     local native=ObjectiveTrackerFrame
     if not native or not native.Header or type(native.AddTopPaddingProvider)~="function" or type(native.MarkDirty)~="function" then return end
     local editing=EditModeManagerFrame and read(EditModeManagerFrame.IsEditModeActive,EditModeManagerFrame)==true
+    if editing and running then trackerPendingSince=nil else recoverTrackerLayout(native,running) end
     local allowed=running and not gamepad() and not editing
         and read(native.ShouldShowHeader,native)~=false
     if not trackerBar and allowed then trackerBar=makeTrackerBar(native) end
