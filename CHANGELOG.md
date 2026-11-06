@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.13-prototype — Collection quest progress
+
+- Refresh item objectives after bag changes and check again after the client settles. Use the same quest objective text and completion flags as Blizzard's Objective Tracker when available.
+
 ## 0.1.12-prototype — Quest log refresh
 
 - Refresh Quest Helper on the same player quest log updates as Blizzard's quest list. Show current objective counts as progress changes.

@@ -3,6 +3,7 @@ local Quests = {records={}, removed={}, revision=0, status="loading", complete=f
 FC.Quests = Quests
 local requested, titles, requestCount, titleCount = {}, {}, 0, 0
 local dirty, enabled, nextScan, lastScan = true, false, 0, -1
+local bagRecheckAt
 local MAX_QUESTS, MAX_OBJECTIVES = 100, 8
 
 -- Read fields behind the same protected/secret-value boundary as API results.
@@ -76,7 +77,18 @@ local function staleRecords()
     return records
 end
 
-local function objectives(id)
+local function nativeObjective(index, logIndex)
+    local status,label,kind,finished=FC.SafeRead(GetQuestLogLeaderBoard,index,logIndex)
+    label=text(label,192)
+    if status~="ready" or not label or not boolean(finished) then return end
+    local have,need=label:match("^%s*(%d+)%s*/%s*(%d+)%s+")
+    if not have then have,need=label:match("(%d+)%s*/%s*(%d+)%s*$") end
+    have,need=tonumber(have),tonumber(need)
+    if not FC.Number(have,0,999999) or not FC.Number(need,1,999999) then have,need=nil,nil end
+    return label,text(kind,24),finished,have,need
+end
+
+local function objectives(id, logIndex)
     local status, list=FC.SafeRead(C_QuestLog and C_QuestLog.GetQuestObjectives,id)
     if status~="ready" or not FC.Readable(list) or type(list)~="table" then return {},"U" end
     -- Check the documented array shape, including sparse/oversized results.
@@ -89,6 +101,8 @@ local function objectives(id)
         return true,n
     end)
     if shape~="ready" or valid~=true or not FC.Number(n,0,MAX_OBJECTIVES) then return {},"P" end
+    local nativeStatus,nativeCount=FC.SafeRead(GetNumQuestLeaderBoards,logIndex)
+    local useNative=nativeStatus=="ready" and nativeCount==n and n>0
     local out,partial={},false
     for i=1,n do
         local row,read=field(list,i)
@@ -97,11 +111,21 @@ local function objectives(id)
         local need,nr=field(row,"numRequired")
         local finished,fr=field(row,"finished")
         local kind=field(row,"type")
-        local objective={text=text(label,192) or ("Objective " .. i),type=text(kind,24)}
+        label=text(label,192)
+        kind=text(kind,24)
+        if useNative then
+            local nativeLabel,nativeKind,nativeFinished,nativeHave,nativeNeed=nativeObjective(i,logIndex)
+            if nativeLabel and (not nativeKind or not kind or nativeKind==kind) then
+                label,lr,finished,fr=nativeLabel,true,nativeFinished,true
+                kind=nativeKind or kind
+                if nativeHave~=nil then have,need,hr,nr=nativeHave,nativeNeed,true,true end
+            end
+        end
+        local objective={text=label or ("Objective " .. i),type=kind}
         if hr and FC.Number(have,0,999999) then objective.have=have else partial=true end
         if nr and FC.Number(need,0,999999) then objective.need=need else partial=true end
         if fr and boolean(finished) then objective.finished=finished else partial=true end
-        if not read or not lr or not text(label,192) then partial=true end
+        if not read or not lr or not label then partial=true end
         out[#out+1]=objective
     end
     return out,partial and "P" or nil
@@ -138,7 +162,7 @@ local function scan()
                 else
                     local title=field(info,"title")
                     title=text(title,96) or Quests.Label(id)
-                    local list,problem=objectives(id)
+                    local list,problem=objectives(id,index)
                     local cs,done=FC.SafeRead(C_QuestLog and C_QuestLog.IsComplete,id)
                     local fs,failed=FC.SafeRead(C_QuestLog and C_QuestLog.IsFailed,id)
                     local state="A"
@@ -195,6 +219,7 @@ end
 function Quests.Enable()
     if enabled then return end
     enabled,dirty,nextScan,lastScan=true,true,0,-1
+    bagRecheckAt=nil
     Quests.records,Quests.removed,Quests.revision,Quests.status,Quests.complete={},{},0,"loading",false
     Quests.membershipComplete,Quests.count=false,nil
     Quests.generation=nil
@@ -204,6 +229,7 @@ end
 function Quests.Disable()
     if not enabled then return end
     enabled,dirty=false,false
+    bagRecheckAt=nil
     commit(staleRecords(),"disabled",false)
 end
 
@@ -212,9 +238,16 @@ function Quests.SyncEnabled()
 end
 
 function Quests.Tick()
-    if not enabled or not dirty or GetTime()<nextScan or FC.IsCombat() then return end
+    if not enabled or FC.IsCombat() then return end
+    local now=GetTime()
+    if bagRecheckAt and now>=bagRecheckAt then
+        bagRecheckAt=nil
+        dirty=true
+        nextScan=math.min(nextScan,lastScan+1)
+    end
+    if not dirty or now<nextScan then return end
     dirty=false
-    lastScan=GetTime()
+    lastScan=now
     local complete=scan()
     nextScan=GetTime()+(complete and 1 or 5)
     if not complete then dirty=true end
@@ -224,6 +257,13 @@ local events={PLAYER_LOGIN=true,PLAYER_ENTERING_WORLD=true,PLAYER_REGEN_ENABLED=
     QUEST_LOG_UPDATE=true,QUEST_ACCEPTED=true,QUEST_REMOVED=true,QUEST_TURNED_IN=true,QUEST_AUTOCOMPLETE=true,QUEST_COMPLETE=true,
     QUEST_WATCH_UPDATE=true,QUEST_WATCH_LIST_CHANGED=true,QUEST_LOG_CRITERIA_UPDATE=true,QUEST_DATA_LOAD_RESULT=true}
 function Quests.OnEvent(event,id)
+    if enabled and event=="BAG_UPDATE_DELAYED" and Quests.count~=0 then
+        dirty=true
+        nextScan=math.min(nextScan,lastScan+1)
+        -- Inventory can settle before the quest objective does. Recheck once
+        -- after the burst even if the client sends no further quest event.
+        bagRecheckAt=bagRecheckAt or GetTime()+1.25
+    end
     if enabled and (event=="QUEST_REMOVED" or event=="QUEST_TURNED_IN") and FC.Number(id,1,10000000) then
         local records={}
         for key,record in pairs(Quests.records) do if key~=id then records[key]=record end end

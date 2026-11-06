@@ -2,7 +2,7 @@
 ## Title: Forever Companion
 ## Notes: Quest routes, group adventures, Legacy goals, gold budgets and material needs.
 ## Author: Forever Companion contributors
-## Version: 0.1.12-prototype
+## Version: 0.1.13-prototype
 ## SavedVariables: ForeverCompanionDB
 ## OptionalDeps: QuestieDB
 
