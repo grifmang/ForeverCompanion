@@ -185,6 +185,14 @@ local function sessionNow()
     if status=="ready" and FC.API.SameGroup(s.context,party) then return s,party end
 end
 
+local function trackRoute(key,id)
+    if not Route.Track(key,id) then return end
+    Guide.Resume()
+    if Route.state~="waiting" then Guide.Tick(Route.Target()) end
+    folded.route[key]=true
+    nextRefresh=0
+end
+
 local function routeRows(party)
     local out={}
     local state=({waiting="Waiting for reliable quest progress or locations.",finished="Area objectives complete. Pick another section to continue.",
@@ -200,7 +208,7 @@ local function routeRows(party)
         local action
         if trackable then action=function()
             if Route.area==key then Route.Stop(); Guide.Stop()
-            else Route.Track(key); Guide.Resume(); folded.route[key]=true end
+            else trackRoute(key) end
         end end
         if heading(out,group,active or i==1 or key=="turnin",trackable and (active and "Stop" or "Track") or nil,action) then
             for _,row in ipairs(group.rows) do
@@ -228,8 +236,8 @@ local function routeRows(party)
                 if record.status=="C" and row.point then
                     local point=row.point
                     side,sideAction="Map",function() notify(Guide.ShowPoint(point)) end
-                elseif trackable and record.observed and record.status=="A" and not target then
-                    side,sideAction="Focus",function() Route.Track(key,id); Guide.Resume() end
+                elseif trackable and record.observed and record.status=="A" and (not target or Guide.WatchPaused(id)) then
+                    side,sideAction="Focus",function() trackRoute(key,id) end
                 end
                 local title=record.level and record.level>0 and ("["..record.level.."] "..record.title) or record.title
                 out[#out+1]={kind="quest",title=(target and "> " or (record.status=="C" and "? " or ""))..title,
@@ -452,10 +460,7 @@ local function chooseArea(button)
             if group.mapID then
                 local key=group.key
                 root:CreateButton(group.label.." ("..#group.rows..")",function()
-                    Route.Track(key)
-                    Guide.Resume()
-                    folded.route[key]=true
-                    nextRefresh=0
+                    trackRoute(key)
                 end)
             end
         end
@@ -566,6 +571,7 @@ local locationEvents={QUEST_LOG_UPDATE=true,QUEST_ACCEPTED=true,QUEST_REMOVED=tr
     SUPER_TRACKING_PATH_UPDATED=true,PLAYER_REGEN_ENABLED=true}
 local function onEvent(event,...)
     if FC.QuestData then FC.QuestData.OnEvent(event,...) end
+    if event=="QUEST_WATCH_LIST_CHANGED" then Guide.OnWatchListChanged(...) end
     if locationEvents[event] then Route.dirty=true end
     if event=="SUPER_TRACKING_CHANGED" or event=="USER_WAYPOINT_UPDATED" or event=="PLAYER_REGEN_ENABLED" then
         Guide.Invalidate()

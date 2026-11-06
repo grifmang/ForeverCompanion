@@ -350,6 +350,7 @@ function Route.Track(key,id)
     Route.area,Route.target=key,id
     choose()
     save()
+    return true
 end
 
 function Route.Stop(preserve)

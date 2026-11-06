@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.14-prototype — Native quest tracking
+
+- Focus, Track and route advance watch the active quest in Blizzard's Quest Log and Objective Tracker.
+- Stop clears the current session's helper-added watch and preserves manual watches. Untracking in Blizzard's UI pauses the helper's native watch for that quest.
+
 ## 0.1.13-prototype — Collection quest progress
 
 - Refresh item objectives after bag changes and check again after the client settles. Use the same quest objective text and completion flags as Blizzard's Objective Tracker when available.

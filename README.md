@@ -1,6 +1,6 @@
 # Forever Companion
 
-Version 0.1.13-prototype — a WoW: Forever addon suite with five optional modules.
+Version 0.1.14-prototype — a WoW: Forever addon suite with five optional modules.
 
 **Status:** Source has been checked with a Lua 5.1 syntax parser. Real-client loading, SavedVariables persistence, tooltip behavior, Legacy data and two-player synchronization still need verification. This is a prototype, not a launch-ready release.
 
@@ -58,7 +58,9 @@ When Quest Helper is enabled, it opens with the Quest and Map Log. **Route** and
 
 **Route** organizes accepted quests by the location of their current objectives. Choose **Track** beside an area to start at its nearest known quest. The current target stays selected as you move, and the route advances when you finish its work in that area. Use **Focus** to select a particular quest and **Stop** to end the route. Finished quests move to **Turn in**. Instanced quests and quests without usable locations remain visible. A tilde marks an approximate straight-line distance. If the quest log is incomplete, expand its collapsed sections in Blizzard's quest log.
 
-For wider pickup and objective coverage, separately install [QuestieDB Forever](https://github.com/Questie/QuestieDB/releases). Quest Helper also reads offers and map data from the game without QuestieDB. Coverage varies, especially for new Forever quests, and the add-on leaves missing locations unknown. A map guidance message explains if the client cannot place a pin or you already have another destination selected. Quest Helper does not alter your quest watch list.
+For wider pickup and objective coverage, separately install [QuestieDB Forever](https://github.com/Questie/QuestieDB/releases). Quest Helper also reads offers and map data from the game without QuestieDB. Coverage varies, especially for new Forever quests, and the add-on leaves missing locations unknown. A map guidance message explains if the client cannot place a pin or you already have another destination selected.
+
+Focus and Track also watch the active quest in Blizzard's Quest Log and Objective Tracker. When the target changes or the route stops, Quest Helper clears only the watch it added during the current session. Untrack from Blizzard's tracker to stop the native watch for that quest. Select Focus again to resume it.
 
 **Track Area** in the Objective Tracker lets you select or stop a route there, and the tracker shows your active target above the native objectives. Choose **Quest Log** to use the regular quest list until you close the log, or select a quest title to open its native details. Use the **Quest Helper** button or the quest log settings menu to return to the helper while the log is open.
 
@@ -118,7 +120,7 @@ The native displays use the same sharing session and preferences as `/fc party`.
 
 Version 0.1.7 corrects the prior quest-log adapter to target Forever's actual Camelot map/quest-list UI. The legacy book-style layout used in the earlier preview is not the layout loaded by this client.
 
-The addon reads the log; it never accepts, abandons, turns in, watches or completes quests for you. Collapsed headers, unreadable data and unsupported objectives produce a partial/unavailable label. Expand native quest-log headers to expose missing entries. Unseen or stale quests remain unknown rather than becoming complete or being silently removed. Supported bounds are 100 retained quests and eight objectives per quest; larger/unsupported reads are labeled partial. Names load from the client's own data, with a quest-ID fallback while unavailable.
+The addon reads the log. Accepting, abandoning, turning in and completing quests are player actions. Collapsed headers, unreadable data and unsupported objectives produce a partial or unavailable label. Expand native quest-log headers to expose missing entries. Unseen or stale quests remain unknown. The reader retains up to 100 quests and eight objectives per quest and labels larger or unsupported reads as partial. Names come from the client's data, with a quest ID shown while a name is unavailable.
 
 You can still save a local session name/meeting point and up to 20 optional preparation tasks. These manual tasks and their readiness are independent from automatic quest progress. Local drafts remain separate from shared sessions.
 

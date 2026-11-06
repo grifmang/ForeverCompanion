@@ -2,11 +2,83 @@ local _, FC = ...
 local Guide={}
 FC.QuestGuide=Guide
 local owner,priorQuest,attempted,paused,pickup,issue,pendingStop
+local watchTarget,watchState,watchNotice,ownedWatch,ownedWatchType
 
 local function read(fn,...)
     local status,result=FC.SafeRead(fn,...)
     if status=="ready" then return result,true end
     return nil,false
+end
+
+local function releaseWatch()
+    if not ownedWatch then return true end
+    local kind,known=read(C_QuestLog and C_QuestLog.GetQuestWatchType,ownedWatch)
+    if not known then return false end
+    if kind==ownedWatchType then
+        local canRemove=QuestUtil and QuestUtil.CanRemoveQuestWatch
+        if canRemove and read(canRemove)~=true then return false end
+        if read(C_QuestLog.RemoveQuestWatch,ownedWatch)~=true then return false end
+    end
+    ownedWatch,ownedWatchType=nil,nil
+    return true
+end
+
+local function syncWatch(id)
+    if watchTarget~=id then
+        watchTarget,watchState,watchNotice=id,nil,nil
+    end
+    if ownedWatch and ownedWatch~=id and not releaseWatch() then
+        watchNotice="Waiting to clear the previous native quest watch."
+        return
+    end
+    if not id then
+        watchNotice=nil
+        return
+    end
+    local kind,known=read(C_QuestLog and C_QuestLog.GetQuestWatchType,id)
+    if not known then
+        watchNotice="Native quest tracking is unavailable here."
+        return
+    end
+    if kind~=nil then
+        watchState,watchNotice="watched",nil
+        return
+    end
+    if watchState=="watched" then
+        watchState,watchNotice="paused","Native quest tracking was stopped in Blizzard's tracker."
+        if ownedWatch==id then ownedWatch,ownedWatchType=nil,nil end
+    end
+    if watchState then return end
+
+    local count=read(C_QuestLog.GetNumQuestWatches)
+    local limit=Constants and Constants.QuestWatchConsts and Constants.QuestWatchConsts.MAX_QUEST_WATCHES
+    if not FC.Number(count,0,1000) or not FC.Number(limit,1,1000) then
+        watchNotice="Native quest tracking is unavailable here."
+        return
+    end
+    if count>=limit then
+        watchState,watchNotice="blocked","Blizzard's Objective Tracker is full."
+        return
+    end
+    local added=read(C_QuestLog.AddQuestWatch,id)
+    local watchedType=read(C_QuestLog.GetQuestWatchType,id)
+    if watchedType~=nil then
+        if added==true then ownedWatch,ownedWatchType=id,watchedType end
+        watchState,watchNotice="watched",nil
+    else
+        watchState,watchNotice="blocked","Blizzard could not track this quest."
+    end
+end
+
+function Guide.OnWatchListChanged(id,added)
+    if not FC.Readable(id) or not FC.Readable(added) then return end
+    if added==false and id then
+        if id==ownedWatch then ownedWatch,ownedWatchType=nil,nil end
+        if id==watchTarget then
+            watchState,watchNotice="paused","Native quest tracking was stopped in Blizzard's tracker."
+        end
+    end
+    if watchState=="blocked" then watchState=nil end
 end
 
 local function questNow()
@@ -95,7 +167,18 @@ function Guide.Tick(row)
             if previous.kind=="pin" and samePin(previous.point) then FC.SafeRead(C_Map.ClearUserWaypoint) end
         end
     end
-    if not row then restore(); attempted,issue=nil,nil; return end
+    if not row then
+        restore()
+        syncWatch(nil)
+        attempted,issue=nil,nil
+        return
+    end
+    syncWatch(nextID)
+    if watchState=="paused" then
+        if priorQuest==nextID then priorQuest=nil end
+        restore()
+        return
+    end
     local point=row.point
     local native=point and not point.approximate
     local key=nextID..":"..tostring(point and point.mapID)..":"..tostring(point and point.x)..":"..tostring(point and point.y)
@@ -151,17 +234,22 @@ function Guide.Resume()
         if previous.kind=="pin" and samePin(previous.point) then FC.SafeRead(C_Map.ClearUserWaypoint) end
     end
     attempted,paused,issue=nil,nil,nil
+    watchState,watchNotice=nil,nil
 end
 
 function Guide.Invalidate()
     if issue and not paused then attempted=nil end
+    if watchState=="blocked" then watchState=nil end
 end
 
-function Guide.HasPending() return owner~=nil or pickup~=nil or pendingStop==true end
+function Guide.WatchPaused(id) return id==watchTarget and watchState=="paused" end
+
+function Guide.HasPending() return owner~=nil or pickup~=nil or pendingStop==true or ownedWatch~=nil end
 
 function Guide.Stop()
     if FC.IsCombat() then pendingStop=true; return end
     restore()
+    syncWatch(nil)
     if samePin(pickup) then FC.SafeRead(C_Map.ClearUserWaypoint) end
     pickup,attempted,paused,issue,pendingStop=nil,nil,nil,nil,nil
 end
@@ -188,6 +276,7 @@ function Guide.ShowPoint(point)
 end
 
 function Guide.Status()
+    if watchNotice then return watchNotice end
     if paused then return "Map guidance paused after a tracking change." end
     if owner then return owner.kind=="pin" and "Approximate map guidance" or "Quest marked on map" end
     return issue

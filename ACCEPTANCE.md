@@ -1,6 +1,6 @@
 # Forever Companion real-client acceptance
 
-Release: 0.1.13-prototype builds. **This is a walkthrough, not evidence of an in-game pass.** Static syntax and packaging results are reported in VERIFICATION.md inside the addon folder.
+Release: 0.1.14-prototype builds. **This is a walkthrough, not evidence of an in-game pass.** Static syntax and packaging results are reported in VERIFICATION.md inside the addon folder.
 
 Use one Forever release character and one additional real client for party sharing. Reuse those two characters throughout; no device matrix or lower-level harness is required.
 
@@ -19,6 +19,8 @@ Use one Forever release character and one additional real client for party shari
 - [ ] Pause sharing or disable Adventure Together, then join/rejoin: version traffic and notices stop along with other sharing. Combat/restrictions defer traffic. No credentials, external request, download, install, quest action or ordinary chat transmission comes from the in-game notice.
 
 ## Quest Helper — one leveling route
+
+- [ ] Manually watch a quest, then use Focus or Track on another. Verify Blizzard's Quest Log checks the helper target and the Objective Tracker shows it. Change the target or finish it and confirm the next quest is watched. Untrack the target in Blizzard's UI and verify it stays unwatched until Focus is selected again. Stop the route and confirm the original manual watch remains. If the native list is full, confirm the helper reports it without dropping an existing watch.
 
 - [ ] Keep Route visible during an out-of-combat collection quest, such as gathering five Peacebloom. Verify a newly accepted quest appears, each pickup advances the objective count, the final pickup moves the quest to Turn in when Blizzard marks it ready, and the turned-in quest disappears. While the helper has the native list hidden, make one of those changes and then click Quest Log. Verify Blizzard's list shows the latest state on return.
 
