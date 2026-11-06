@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.12-prototype — Quest log refresh
+
+- Refresh Quest Helper on the same player quest log updates as Blizzard's quest list. Show current objective counts as progress changes.
+- Rebuild the regular quest list when returning to it from Quest Helper. Remove departed quests from a fully observed log even if another quest's objectives are unavailable.
+
 ## 0.1.11-prototype — Quest Helper on by default
 
 - Open Quest Helper automatically when the Quest and Map Log opens. The native quest list remains available for the rest of that visit.

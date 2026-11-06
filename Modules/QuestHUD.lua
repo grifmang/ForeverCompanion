@@ -5,6 +5,7 @@ local Route,Guide,UI=FC.QuestRoute,FC.QuestGuide,FC.UI
 local GOLD,TEXT,DIM,GREEN={1,.82,.43},{1,.94,.83},{.82,.77,.66},{.70,.85,.55}
 local panel,launcher,trackerBar,ownedScroll,searchSizing
 local nextRefresh,message,messageUntil=0,nil,0
+local lastQuestRevision
 local closeLog,openedThisVisit
 local folded={route={},nearby={}}
 
@@ -166,6 +167,17 @@ local function heading(rows,group,defaultOpen,side,callback)
     return open
 end
 
+local function objectiveLabel(objective)
+    local label=objective.text
+    if objective.have==nil or not objective.need or objective.need<=1 then return label end
+    local have,need=label:match("(%d+)%s*/%s*(%d+)")
+    if tonumber(need)==objective.need then
+        if tonumber(have)==objective.have then return label end
+        return (label:gsub("%d+%s*/%s*%d+",objective.have.."/"..objective.need,1))
+    end
+    return label.." ("..objective.have.."/"..objective.need..")"
+end
+
 local function sessionNow()
     local s=FC.IsEnabled("party") and FC.Adventure.sharing and FC.Adventure.shared
     if not s or s.phase=="syncing" then return end
@@ -202,7 +214,7 @@ local function routeRows(party)
                     if target then body[#body+1]="Tracking"..estimate(row) end
                     for _,objective in ipairs(record.objectives) do
                         if target or not objective.finished then
-                            body[#body+1]=(objective.finished and "Done: " or "- ")..objective.text
+                            body[#body+1]=(objective.finished and "Done: " or "- ")..objectiveLabel(objective)
                             if not target and #body>=2 then break end
                         end
                     end
@@ -306,6 +318,7 @@ closeLog=function()
     if scroll==current and not (details and details:IsShown()) and not scroll:IsShown() then
         local status=FC.SafeRead(scroll.Show,scroll)
         if status~="ready" and not scroll:IsShown() then closePending=true; return false end
+        if scroll:IsVisible() then FC.SafeRead(QuestLogQuests_Update) end
     end
     ownedScroll,closePending=nil,nil
     if panel then panel:Hide() end
@@ -515,7 +528,9 @@ function HUD.Tick()
     if not running and not ownedScroll and not searchSizing and not (trackerBar and trackerBar.padding>0)
         and not Guide.HasPending() then return end
     local now=GetTime()
-    if now<nextRefresh then return end
+    local revision=FC.Quests.revision
+    if now<nextRefresh and (not running or revision==lastQuestRevision) then return end
+    lastQuestRevision=revision
     nextRefresh=now+.65
     local status,err=pcall(function()
         if running and not FC.IsCombat() then

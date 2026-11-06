@@ -1,5 +1,5 @@
 local addonName, FC = ...
-FC.name, FC.version = addonName, "0.1.11-prototype"
+FC.name, FC.version = addonName, "0.1.12-prototype"
 FC.modules, FC.diagnostics, FC.pending = {}, {}, {}
 FC.keys = {"legacy", "wallet", "items", "quests", "party"}
 local unpackValues = unpack or table.unpack

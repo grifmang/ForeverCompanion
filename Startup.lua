@@ -25,7 +25,7 @@ local function start()
     for _,event in ipairs({"PLAYER_MONEY","BAG_UPDATE_DELAYED","ITEM_DATA_LOAD_RESULT","GET_ITEM_INFO_RECEIVED",
         "ACHIEVEMENT_EARNED","CRITERIA_UPDATE","TRAIT_CONFIG_UPDATED","PLAYER_LEVEL_UP","GROUP_ROSTER_UPDATE",
         "PARTY_LEADER_CHANGED","GROUP_JOINED","GROUP_LEFT","CHAT_MSG_ADDON","PLAYER_REGEN_DISABLED","PLAYER_REGEN_ENABLED","PLAYER_ENTERING_WORLD",
-        "QUEST_LOG_UPDATE","QUEST_ACCEPTED","QUEST_REMOVED","QUEST_TURNED_IN","QUEST_AUTOCOMPLETE","QUEST_COMPLETE","QUEST_WATCH_UPDATE","QUEST_DATA_LOAD_RESULT","QUEST_LOG_CRITERIA_UPDATE",
+        "QUEST_LOG_UPDATE","UNIT_QUEST_LOG_CHANGED","QUEST_ACCEPTED","QUEST_REMOVED","QUEST_TURNED_IN","QUEST_AUTOCOMPLETE","QUEST_COMPLETE","QUEST_WATCH_UPDATE","QUEST_DATA_LOAD_RESULT","QUEST_LOG_CRITERIA_UPDATE",
         "QUEST_WATCH_LIST_CHANGED","QUEST_POI_UPDATE","SUPER_TRACKING_CHANGED","SUPER_TRACKING_PATH_UPDATED","USER_WAYPOINT_UPDATED",
         "ZONE_CHANGED","ZONE_CHANGED_INDOORS","ZONE_CHANGED_NEW_AREA","GOSSIP_SHOW","GOSSIP_CLOSED","GOSSIP_OPTIONS_UPDATE",
         "QUEST_GREETING","QUEST_FINISHED","QUEST_DETAIL","QUESTLINE_UPDATE","MINIMAP_UPDATE_TRACKING","GAME_PAD_ACTIVE_CHANGED",
@@ -63,6 +63,12 @@ events:SetScript("OnEvent",function(_,event,...)
     elseif event=="PLAYER_LOGIN" then start()
     else
         if not started then start() end
+        if event=="UNIT_QUEST_LOG_CHANGED" then
+            -- The native Quest and Map Log treats the player's unit update as a full log refresh.
+            local unit=...
+            if not FC.Readable(unit) or unit~="player" then return end
+            event="QUEST_LOG_UPDATE"
+        end
         if event=="GROUP_JOINED" or event=="GROUP_LEFT" then FC.API.GroupChanged(...) end
         if event=="CHAT_MSG_ADDON" then
             local ok,err=pcall(FC.PartyProtocol.Receive,...)

@@ -164,9 +164,9 @@ local function scan()
     for _,record in pairs(records) do if record.observed then observedCount=observedCount+1 end end
     Quests.membershipComplete=rows==total and observedCount==total and readableRows==shown
     if not Quests.membershipComplete then complete=false end
-    if not complete then
-        -- A partial view never authoritatively removes a quest. Prefer retaining
-        -- existing IDs over newly exposed IDs if the combined view exceeds 100.
+    if not Quests.membershipComplete then
+        -- Retain unseen quests only when the log's membership is incomplete.
+        -- Unreadable objectives in a fully enumerated log cannot keep a removed quest alive.
         local oldIDs={}
         for id in pairs(Quests.records) do oldIDs[#oldIDs+1]=id end
         table.sort(oldIDs)

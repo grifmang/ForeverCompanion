@@ -1,6 +1,6 @@
 # Forever Companion real-client acceptance
 
-Release: 0.1.11-prototype builds. **This is a walkthrough, not evidence of an in-game pass.** Static syntax and packaging results are reported in VERIFICATION.md inside the addon folder.
+Release: 0.1.12-prototype builds. **This is a walkthrough, not evidence of an in-game pass.** Static syntax and packaging results are reported in VERIFICATION.md inside the addon folder.
 
 Use one Forever release character and one additional real client for party sharing. Reuse those two characters throughout; no device matrix or lower-level harness is required.
 
@@ -19,6 +19,8 @@ Use one Forever release character and one additional real client for party shari
 - [ ] Pause sharing or disable Adventure Together, then join/rejoin: version traffic and notices stop along with other sharing. Combat/restrictions defer traffic. No credentials, external request, download, install, quest action or ordinary chat transmission comes from the in-game notice.
 
 ## Quest Helper — one leveling route
+
+- [ ] Keep Route visible during an out-of-combat quest update. Verify a newly accepted quest appears, a partial objective count advances, and a turned-in quest disappears without closing the map or using a slash command. While the helper has the native list hidden, make one of those changes and then click Quest Log. Verify Blizzard's list shows the latest state on return.
 
 - [ ] With Quest Helper enabled, open the Quest and Map Log and verify the helper opens automatically. Choose Quest Log, verify the stock list stays open for the current visit, then close and reopen the log. Check that Quest Helper returns automatically and that opening native quest details still shows those details. With no watched quests, confirm Nearby is available from the tracker. Compare Nearby offers with a nearby NPC, then accept an offer and check it moves into Route. If QuestieDB Forever is available, check that two pickups from different givers can show a shared work area.
 - [ ] Use accepted quests with two separate work areas. Verify the list groups by objective destination rather than by quest giver. Track an area and compare the first target with known nearby positions. Move toward another quest without finishing the current one; the target stays selected. Complete the work for one quest, check that the nearest remaining quest is selected, and check that the finished quest appears in Turn in. When only this area's work is complete, keep the quest in its other section. A quest without coordinates remains visible.
